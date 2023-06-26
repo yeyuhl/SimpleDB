@@ -165,7 +165,7 @@ public class BPlusTree {
     }
 
     /**
-     * 存储在B+树中的所有RecordIds按keys的升序顺序返回一个迭代器
+     * 存储在B+树中的所有RecordIds按相应keys的升序顺序返回一个迭代器
      * <p>
      * // 构建新B+树并插入值
      * BPlusTree tree = new BPlusTree("t.txt", Type.intType(), 4);
@@ -191,7 +191,7 @@ public class BPlusTree {
     }
 
     /**
-     * 存储在B+树中的所有大于等于给定key的RecordIds按keys的升序顺序返回一个迭代器
+     * 存储在B+树中的所有大于等于给定key的RecordIds按相应keys的升序顺序返回一个迭代器
      * <p>
      * // 构建新B+树并插入值
      * tree.put(new IntDataBox(2), new RecordId(2, (short) 2));

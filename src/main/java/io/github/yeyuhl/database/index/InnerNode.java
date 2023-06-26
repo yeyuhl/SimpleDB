@@ -13,44 +13,53 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 /**
- * B+ 树的内部节点。顺序为 d 的 B+ 树中的每个内部节点都存储在 d 和 2d 键之间。具有 n 个键的内部节点存储指向子节点的 n + 1 个“指针”（其中指针只是一个页码）。
- * 此外，每个内部节点都序列化并持久化在单个页面上;有关如何序列化内部节点的详细信息，请参阅 toBytes 和 fromBytes。例如，下面是阶 2 内节点的图示：
- * A inner node of a B+ tree. Every inner node in a B+ tree of order d stores
- * between d and 2d keys. An inner node with n keys stores n + 1 "pointers" to
- * children nodes (where a pointer is just a page number). Moreover, every
- * inner node is serialized and persisted on a single page; see toBytes and
- * fromBytes for details on how an inner node is serialized. For example, here
- * is an illustration of an order 2 inner node:
+ * B+树的内部节点，d阶B+树中的每个内部节点存储着d到2d个键
+ * 具有n个键的内部节点存储指向子节点的n+1个“指针”（指针其实是一个page number），此外每个内部节点都序列化并持久化在单个page上
+ * 例如，下面是2阶的内部节点的图示：
  * <p>
  * +----+----+----+----+
  * | 10 | 20 | 30 |    |
  * +----+----+----+----+
  * /     |    |     \
+ *
+ * @author yeyuhl
+ * @since 2023/6/26
  */
 class InnerNode extends BPlusNode {
-    // Metadata about the B+ tree that this node belongs to.
+    /**
+     * 该内部节点所在的B+树的元数据
+     */
     private BPlusTreeMetadata metadata;
 
-    // Buffer manager
+    /**
+     * Buffer manager
+     */
     private BufferManager bufferManager;
 
-    // Lock context of the B+ tree
+    /**
+     * 该B+ tree的Lock context
+     */
     private LockContext treeContext;
 
-    // The page on which this leaf is serialized.
+    /**
+     * 该内部节点序列化后所存储在的page
+     */
     private Page page;
 
-    // The keys and child pointers of this inner node. See the comment above
-    // LeafNode.keys and LeafNode.rids in LeafNode.java for a warning on the
-    // difference between the keys and children here versus the keys and children
-    // stored on disk. `keys` is always stored in ascending order.
+    /**
+     * 该内部节点的键
+     */
     private List<DataBox> keys;
+
+    /**
+     * 子节点指针，实际上是page number
+     */
     private List<Long> children;
 
     // Constructors ////////////////////////////////////////////////////////////
 
     /**
-     * Construct a brand new inner node.
+     * 构造一个全新的内部节点
      */
     InnerNode(BPlusTreeMetadata metadata, BufferManager bufferManager, List<DataBox> keys,
               List<Long> children, LockContext treeContext) {
@@ -59,14 +68,13 @@ class InnerNode extends BPlusNode {
     }
 
     /**
-     * Construct an inner node that is persisted to page `page`.
+     * 构造一个持久化到指定page的内部节点
      */
     private InnerNode(BPlusTreeMetadata metadata, BufferManager bufferManager, Page page,
                       List<DataBox> keys, List<Long> children, LockContext treeContext) {
         try {
             assert (keys.size() <= 2 * metadata.getOrder());
             assert (keys.size() + 1 == children.size());
-
             this.metadata = metadata;
             this.bufferManager = bufferManager;
             this.treeContext = treeContext;
@@ -80,45 +88,90 @@ class InnerNode extends BPlusNode {
     }
 
     // Core API ////////////////////////////////////////////////////////////////
-    // See BPlusNode.get.
+
     @Override
     public LeafNode get(DataBox key) {
-        // TODO(proj2): implement
-
-        return null;
+        BPlusNode child = BPlusNode.fromBytes(metadata, bufferManager, treeContext, children.get(numLessThanEqual(key, keys)));
+        return child.get(key);
     }
 
-    // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf() {
         assert (children.size() > 0);
-        // TODO(proj2): implement
-
+        BPlusNode leftMostLeaf = BPlusNode.fromBytes(metadata, bufferManager, treeContext, children.get(0));
         return null;
     }
 
-    // See BPlusNode.put.
+    /**
+     * put和bulkLoad的辅助方法，用于将键和子节点插入到内部节点中
+     */
+    private Optional<Pair<DataBox, Long>> insert(DataBox key, Long child) {
+        // 查看key和node应该插入的位置
+        int index = numLessThanEqual(key, keys);
+        keys.add(index, key);
+        children.add(index + 1, child);
+        // 查看插入后的键的数量是否超过了2d
+        if (keys.size() <= 2 * metadata.getOrder()) {
+            // 如果没有溢出，则对page进行更新，并且返回Optional.empty()
+            // 对page操作，需要上锁
+            sync();
+            return Optional.empty();
+        } else {
+            // 如果溢出，则需要分裂节点，并返回(split_key, right_node_page_num)的Pair
+            // 上一级的父节点需要的key
+            DataBox split_key = keys.get(metadata.getOrder());
+            // 右边子结点需要的key和page number
+            List<DataBox> rightKeys = keys.subList(metadata.getOrder() + 1, keys.size());
+            List<Long> rightChildren = children.subList(metadata.getOrder() + 1, children.size());
+            // 左边原节点需要的key和page number
+            keys = keys.subList(0, metadata.getOrder());
+            children = children.subList(0, metadata.getOrder() + 1);
+            // 更新到page
+            sync();
+            // 创建新的内部节点
+            InnerNode new_rightSibling = new InnerNode(metadata, bufferManager, rightKeys, rightChildren, treeContext);
+            return Optional.of(new Pair(split_key, new_rightSibling.getPage().getPageNum()));
+        }
+    }
+
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
-        // TODO(proj2): implement
-
-        return Optional.empty();
+        BPlusNode child = BPlusNode.fromBytes(metadata, bufferManager, treeContext, children.get(numLessThanEqual(key, keys)));
+        Optional<Pair<DataBox, Long>> pair = child.put(key, rid);
+        if (pair.isPresent()) {
+            Pair<DataBox, Long> p = pair.get();
+            return insert(p.getFirst(), p.getSecond());
+        } else {
+            return pair;
+        }
     }
 
-    // See BPlusNode.bulkLoad.
     @Override
-    public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
-                                                  float fillFactor) {
-        // TODO(proj2): implement
-
-        return Optional.empty();
+    public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data, float fillFactor) {
+        BPlusNode rightMostChild = BPlusNode.fromBytes(metadata, bufferManager, treeContext, children.get(children.size() - 1));
+        // 实际上调用的是LeafNode的bulkLoad
+        Optional<Pair<DataBox, Long>> pair = rightMostChild.bulkLoad(data, fillFactor);
+        if (pair.isPresent()) {
+            // 如果溢出
+            DataBox spilt_key = pair.get().getFirst();
+            Long child = pair.get().getSecond();
+            Optional<Pair<DataBox, Long>> mySplitInfo = insert(spilt_key, child);
+            if (mySplitInfo.isPresent()) {
+                return mySplitInfo;
+            } else {
+                // 如果内部节点还是没有分裂，递归调用bulkLoad
+                return bulkLoad(data, fillFactor);
+            }
+        } else {
+            // 如果不溢出，不用分裂节点
+            return pair;
+        }
     }
 
-    // See BPlusNode.remove.
     @Override
     public void remove(DataBox key) {
-        // TODO(proj2): implement
-
+        LeafNode leaf = get(key);
+        leaf.remove(key);
         return;
     }
 
@@ -148,51 +201,44 @@ class InnerNode extends BPlusNode {
         }
     }
 
-    // Just for testing.
+    /**
+     * 测试用
+     */
     List<DataBox> getKeys() {
         return keys;
     }
 
-    // Just for testing.
+    /**
+     * 测试用
+     */
     List<Long> getChildren() {
         return children;
     }
 
     /**
-     * Returns the largest number d such that the serialization of an InnerNode
-     * with 2d keys will fit on a single page.
+     * 返回最大数字d，以便具有2d个keys的InnerNode序列化后能适应单个page大小
      */
     static int maxOrder(short pageSize, Type keySchema) {
-        // A leaf node with n entries takes up the following number of bytes:
+        // 具有n个keys的内部节点占用的字节数为：1 + 4 + (n * keySize) + ((n + 1) * 8)
+        //   - 1字节用于存储isLeaf的
+        //   - 4字节用于存储n
+        //   - keySize表示用于存储keySchema类型的DataBox的字节数
+        //   - 8字节用于存储子节点指针
         //
-        //   1 + 4 + (n * keySize) + ((n + 1) * 8)
-        //
-        // where
-        //
-        //   - 1 is the number of bytes used to store isLeaf,
-        //   - 4 is the number of bytes used to store n,
-        //   - keySize is the number of bytes used to store a DataBox of type
-        //     keySchema, and
-        //   - 8 is the number of bytes used to store a child pointer.
-        //
-        // Solving the following equation
-        //
+        //   根据以上条件得到这个不等式：
         //   5 + (n * keySize) + ((n + 1) * 8) <= pageSizeInBytes
-        //
-        // we get
-        //
+        //   求解后得到：
         //   n = (pageSizeInBytes - 13) / (keySize + 8)
         //
-        // The order d is half of n.
+        // 其中阶数d = n / 2
         int keySize = keySchema.getSizeInBytes();
         int n = (pageSize - 13) / (keySize + 8);
         return n / 2;
     }
 
     /**
-     * Given a list ys sorted in ascending order, numLessThanEqual(x, ys) returns
-     * the number of elements in ys that are less than or equal to x. For
-     * example,
+     * 给定一个按升序排序的列表ys，而numLessThanEqual(x,ys)返回ys中小于或等于x的元素的数量
+     * 举个例子：
      * <p>
      * numLessThanEqual(0, Arrays.asList(1, 2, 3, 4, 5)) == 0
      * numLessThanEqual(1, Arrays.asList(1, 2, 3, 4, 5)) == 1
@@ -202,19 +248,16 @@ class InnerNode extends BPlusNode {
      * numLessThanEqual(5, Arrays.asList(1, 2, 3, 4, 5)) == 5
      * numLessThanEqual(6, Arrays.asList(1, 2, 3, 4, 5)) == 5
      * <p>
-     * This helper function is useful when we're navigating down a B+ tree and
-     * need to decide which child to visit. For example, imagine an index node
-     * with the following 4 keys and 5 children pointers:
+     * 当我们沿着B+树向下遍历并需要决定要访问哪个子节点时，此辅助函数很有用
+     * 举个例子：假设一个索引节点具有4个键和5个子指针
      * <p>
      * +---+---+---+---+
      * | a | b | c | d |
      * +---+---+---+---+
-     * /    |   |   |    \
-     * 0     1   2   3     4
+     * /   |   |   |    \
+     * 0   1   2   3     4
      * <p>
-     * If we're searching the tree for value c, then we need to visit child 3.
-     * Not coincidentally, there are also 3 values less than or equal to c (i.e.
-     * a, b, c).
+     * 如果我们在树中搜索c，那么我们需要访问子节点3。并非巧合的是，还有3个值小于或等于c（即 a、b、c）。
      */
     static <T extends Comparable<T>> int numLessThanEqual(T x, List<T> ys) {
         int n = 0;
@@ -262,8 +305,7 @@ class InnerNode extends BPlusNode {
     }
 
     /**
-     * An inner node on page 0 with a single key k and two children on page 1 and
-     * 2 is turned into the following DOT fragment:
+     * 第0页上具有单个键k和第1、2页上有两个子节点的内部节点将转换为以下 DOT 片段
      * <p>
      * node0[label = "<f0>|k|<f1>"];
      * ... // children
@@ -289,37 +331,27 @@ class InnerNode extends BPlusNode {
             BPlusNode child = getChild(i);
             long childPageNum = child.getPage().getPageNum();
             lines.add(child.toDot());
-            lines.add(String.format("  \"node%d\":f%d -> \"node%d\";",
-                    pageNum, i, childPageNum));
+            lines.add(String.format("  \"node%d\":f%d -> \"node%d\";", pageNum, i, childPageNum));
         }
-
         return String.join("\n", lines);
     }
 
     // Serialization ///////////////////////////////////////////////////////////
     @Override
     public byte[] toBytes() {
-        // When we serialize an inner node, we write:
+        // 当序列化内部节点时，序列化后的内容为：
+        //   a.文本值为0(1字节)，表示此节点不是叶节点
+        //   b.该内部节点包含的键数为n(4个字节)(比子指针数少 1)
+        //   c.n个keys
+        //   d.n+1个子节点指针
         //
-        //   a. the literal value 0 (1 byte) which indicates that this node is not
-        //      a leaf node,
-        //   b. the number n (4 bytes) of keys this inner node contains (which is
-        //      one fewer than the number of children pointers),
-        //   c. the n keys, and
-        //   d. the n+1 children pointers.
-        //
-        // For example, the following bytes:
-        //
+        // 举个例子：具有一个键（即1）和两个子节点指针（即第3页和第7页）的内部节点表示如下：
         //   +----+-------------+----+-------------------------+-------------------------+
         //   | 00 | 00 00 00 01 | 01 | 00 00 00 00 00 00 00 03 | 00 00 00 00 00 00 00 07 |
         //   +----+-------------+----+-------------------------+-------------------------+
         //    \__/ \___________/ \__/ \_________________________________________________/
         //     a         b        c                           d
         //
-        // represent an inner node with one key (i.e. 1) and two children pointers
-        // (i.e. page 3 and page 7).
-
-        // All sizes are in bytes.
         assert (keys.size() <= 2 * metadata.getOrder());
         assert (keys.size() + 1 == children.size());
         int isLeafSize = 1;
@@ -341,10 +373,9 @@ class InnerNode extends BPlusNode {
     }
 
     /**
-     * Loads an inner node from page `pageNum`.
+     * 根据pageNum从指定page中加载内部节点
      */
-    public static InnerNode fromBytes(BPlusTreeMetadata metadata,
-                                      BufferManager bufferManager, LockContext treeContext, long pageNum) {
+    public static InnerNode fromBytes(BPlusTreeMetadata metadata, BufferManager bufferManager, LockContext treeContext, long pageNum) {
         Page page = bufferManager.fetchPage(treeContext, pageNum);
         Buffer buf = page.getBuffer();
 

@@ -79,7 +79,7 @@ abstract class BPlusNode {
      *   | 1| 2|  |  |->| 3| 4| 5|  |->|11|12|13|  |->|21|22|23|  |
      *   +--+--+--+--+  +--+--+--+--+  +--+--+--+--+  +--+--+--+--+
      *   leaf0          leaf3          leaf1          leaf2
-     * 可以看到leaf0由于溢出，创建了一个新的兄弟节点leaf3，d个entries在leaf0(d是5/2=2)，d+1之后的entries在leaf3
+     * 可以看到leaf0由于溢出，创建了一个新的兄弟节点leaf3，d个entries在leaf0(d是5/2=2)，d+1及之后的entries在leaf3
      * <p>
      * 当一个内部节点分裂时，前d个entries在原来节点，最后d个entries在新创建的节点，而中间的entries则向上移动（不是复制）
      * 举个例子：
