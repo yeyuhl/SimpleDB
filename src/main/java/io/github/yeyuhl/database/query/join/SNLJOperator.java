@@ -6,12 +6,12 @@ import io.github.yeyuhl.database.query.JoinOperator;
 import io.github.yeyuhl.database.query.QueryOperator;
 import io.github.yeyuhl.database.table.Record;
 
+
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
- * Performs an equijoin between two relations on leftColumnName and
- * rightColumnName respectively using the Simple Nested Loop Join algorithm.
+ * 使用SNLJ(简单嵌套循环连接)算法分别在 leftColumnName 和 rightColumnName 上的两个关系之间执行等值连接
  */
 public class SNLJOperator extends JoinOperator {
     public SNLJOperator(QueryOperator leftSource,
@@ -19,8 +19,7 @@ public class SNLJOperator extends JoinOperator {
                         String leftColumnName,
                         String rightColumnName,
                         TransactionContext transaction) {
-        super(leftSource, materialize(rightSource, transaction),
-              leftColumnName, rightColumnName, transaction, JoinType.SNLJ);
+        super(leftSource, materialize(rightSource, transaction), leftColumnName, rightColumnName, transaction, JoinType.SNLJ);
         this.stats = this.estimateStats();
     }
 
@@ -37,9 +36,8 @@ public class SNLJOperator extends JoinOperator {
     }
 
     /**
-     * A record iterator that executes the logic for a simple nested loop join.
-     * Note that the left table is the "outer" loop and the right table is the
-     * "inner" loop.
+     * 执行SNLJ逻辑的record迭代器
+     * 左表是“外部”循环(外部表)，右表是“内部”循环(内部表)
      */
     private class SNLJIterator implements Iterator<Record> {
         // Iterator over all the records of the left relation
@@ -61,22 +59,21 @@ public class SNLJOperator extends JoinOperator {
         }
 
         /**
-         * Returns the next record that should be yielded from this join,
-         * or null if there are no more records to join.
+         * 返回应从此连接生成的下一条record，如果没有则返回null
          */
         private Record fetchNextRecord() {
             if (leftRecord == null) {
                 // The left source was empty, nothing to fetch
                 return null;
             }
-            while(true) {
+            while (true) {
                 if (this.rightSourceIterator.hasNext()) {
                     // there's a next right record, join it if there's a match
                     Record rightRecord = rightSourceIterator.next();
                     if (compare(leftRecord, rightRecord) == 0) {
                         return leftRecord.concat(rightRecord);
                     }
-                } else if (leftSourceIterator.hasNext()){
+                } else if (leftSourceIterator.hasNext()) {
                     // there's no more right records but there's still left
                     // records. Advance left and reset right
                     this.leftRecord = leftSourceIterator.next();

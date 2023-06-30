@@ -1,17 +1,11 @@
 package io.github.yeyuhl.database.query;
 
-import io.github.yeyuhl.database.DatabaseException;
-import io.github.yeyuhl.database.cli.parser.ParseException;
-import io.github.yeyuhl.database.cli.parser.RookieParser;
-import io.github.yeyuhl.database.cli.visitor.ExpressionVisitor;
 import io.github.yeyuhl.database.databox.DataBox;
-import io.github.yeyuhl.database.query.aggr.DataFunction;
+import io.github.yeyuhl.database.query.expr.Expression;
 import io.github.yeyuhl.database.table.Record;
 import io.github.yeyuhl.database.table.Schema;
 import io.github.yeyuhl.database.table.stats.TableStats;
 
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class ProjectOperator extends QueryOperator {
@@ -24,8 +18,9 @@ public class ProjectOperator extends QueryOperator {
     // Schema of the source operator
     private Schema sourceSchema;
 
-    // List of DataFunctions
-    private List<DataFunction> dataFunctions;
+    // List of expressions that will be evaluated for each record. Each
+    // expression corresponds to one of the column names in outputColumns.
+    private List<Expression> expressions;
 
     /**
      * Creates a new ProjectOperator that reads tuples from source and filters
@@ -37,56 +32,48 @@ public class ProjectOperator extends QueryOperator {
      */
     public ProjectOperator(QueryOperator source, List<String> columns, List<String> groupByColumns) {
         super(OperatorType.PROJECT);
-        List<DataFunction> dataFunctions = new ArrayList<>();
+        List<Expression> expressions = new ArrayList<>();
         for (int i = 0; i < columns.size(); i++) {
-            // No data functions provided, manually parse each input column
-            RookieParser parser = new RookieParser(
-                    new ByteArrayInputStream(columns.get(i).getBytes(StandardCharsets.UTF_8)));
-            try {
-                ExpressionVisitor visitor = new ExpressionVisitor();
-                parser.expression().jjtAccept(visitor, null);
-                dataFunctions.add(visitor.build());
-            } catch (ParseException e) {
-                throw new DatabaseException(e.getMessage());
-            }
+            // No expression objects provided, manually parse each input column
+            expressions.add(Expression.fromString(columns.get(i)));
         }
-        initialize(source, columns, dataFunctions, groupByColumns);
+        initialize(source, columns, expressions, groupByColumns);
     }
 
-    public ProjectOperator(QueryOperator source, List<String> columns, List<DataFunction> dataFunctions, List<String> groupByColumns) {
+    public ProjectOperator(QueryOperator source, List<String> columns, List<Expression> expressions, List<String> groupByColumns) {
         super(OperatorType.PROJECT);
-        initialize(source, columns, dataFunctions, groupByColumns);
+        initialize(source, columns, expressions, groupByColumns);
     }
 
-    public void initialize(QueryOperator source, List<String> columns, List<DataFunction> dataFunctions, List<String> groupByColumns) {
+    public void initialize(QueryOperator source, List<String> columns, List<Expression> expressions, List<String> groupByColumns) {
         this.outputColumns = columns;
         this.groupByColumns = groupByColumns;
-        this.dataFunctions = dataFunctions;
+        this.expressions = expressions;
         this.sourceSchema = source.getSchema();
         this.source = source;
         Schema schema = new Schema();
         for (int i = 0; i < columns.size(); i++) {
-            dataFunctions.get(i).setSchema(this.sourceSchema);
-            schema.add(columns.get(i), dataFunctions.get(i).getType());
+            expressions.get(i).setSchema(this.sourceSchema);
+            schema.add(columns.get(i), expressions.get(i).getType());
         }
         this.outputSchema = schema;
 
         Set<Integer> groupByIndices = new HashSet<>();
-        for (String colName: groupByColumns) {
+        for (String colName : groupByColumns) {
             groupByIndices.add(this.sourceSchema.findField(colName));
         }
         boolean hasAgg = false;
-        for (int i = 0; i < dataFunctions.size(); i++) {
-            hasAgg |= dataFunctions.get(i).hasAgg();
+        for (int i = 0; i < expressions.size(); i++) {
+            hasAgg |= expressions.get(i).hasAgg();
         }
         if (!hasAgg) return;
 
-        for (int i = 0; i < dataFunctions.size(); i++) {
+        for (int i = 0; i < expressions.size(); i++) {
             Set<Integer> dependencyIndices = new HashSet<>();
-            for (String colName: dataFunctions.get(i).getDependencies()) {
+            for (String colName : expressions.get(i).getDependencies()) {
                 dependencyIndices.add(this.sourceSchema.findField(colName));
             }
-            if (!dataFunctions.get(i).hasAgg()) {
+            if (!expressions.get(i).hasAgg()) {
                 dependencyIndices.removeAll(groupByIndices);
                 if (dependencyIndices.size() != 0) {
                     int any = dependencyIndices.iterator().next();
@@ -100,7 +87,9 @@ public class ProjectOperator extends QueryOperator {
     }
 
     @Override
-    public boolean isProject() { return true; }
+    public boolean isProject() {
+        return true;
+    }
 
     @Override
     protected Schema computeSchema() {
@@ -135,7 +124,7 @@ public class ProjectOperator extends QueryOperator {
 
         private ProjectIterator() {
             this.sourceIterator = ProjectOperator.this.getSource().iterator();
-            for (DataFunction func: dataFunctions) {
+            for (Expression func : expressions) {
                 this.hasAgg |= func.hasAgg();
             }
         }
@@ -149,9 +138,9 @@ public class ProjectOperator extends QueryOperator {
         public Record next() {
             if (!this.hasNext()) throw new NoSuchElementException();
             Record curr = this.sourceIterator.next();
-            if (!this.hasAgg && groupByColumns.size() == 0 ) {
+            if (!this.hasAgg && groupByColumns.size() == 0) {
                 List<DataBox> newValues = new ArrayList<>();
-                for (DataFunction f: dataFunctions) {
+                for (Expression f : expressions) {
                     newValues.add(f.evaluate(curr));
                 }
                 return new Record(newValues);
@@ -160,7 +149,7 @@ public class ProjectOperator extends QueryOperator {
             // Everything after here is to handle aggregation
             Record base = curr; // We'll draw the GROUP BY values from here
             while (curr != GroupByOperator.MARKER) {
-                for (DataFunction dataFunction: dataFunctions) {
+                for (Expression dataFunction : expressions) {
                     if (dataFunction.hasAgg()) dataFunction.update(curr);
                 }
                 if (!sourceIterator.hasNext()) break;
@@ -169,7 +158,7 @@ public class ProjectOperator extends QueryOperator {
 
             // Figure out where to get each value in the output record from
             List<DataBox> values = new ArrayList<>();
-            for (DataFunction dataFunction: dataFunctions) {
+            for (Expression dataFunction : expressions) {
                 if (dataFunction.hasAgg()) {
                     values.add(dataFunction.evaluate(base));
                     dataFunction.reset();

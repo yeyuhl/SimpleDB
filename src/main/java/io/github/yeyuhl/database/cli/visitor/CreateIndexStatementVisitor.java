@@ -4,14 +4,17 @@ import io.github.yeyuhl.database.Transaction;
 import io.github.yeyuhl.database.cli.parser.ASTColumnName;
 import io.github.yeyuhl.database.cli.parser.ASTIdentifier;
 
-public class CreateIndexStatementVisitor extends StatementVisitor {
+
+import java.io.PrintStream;
+
+class CreateIndexStatementVisitor extends StatementVisitor {
     public String tableName;
     public String columnName;
 
     @Override
-    public void execute(Transaction transaction) {
+    public void execute(Transaction transaction, PrintStream out) {
         transaction.createIndex(tableName, columnName, false);
-        System.out.printf("CREATE INDEX ON %s (%s)\n", tableName, columnName);
+        out.printf("CREATE INDEX ON %s (%s)\n", tableName, columnName);
     }
 
     @Override

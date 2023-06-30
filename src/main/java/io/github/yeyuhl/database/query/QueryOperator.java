@@ -9,6 +9,7 @@ import io.github.yeyuhl.database.table.Schema;
 import io.github.yeyuhl.database.table.Table;
 import io.github.yeyuhl.database.table.stats.TableStats;
 
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -35,6 +36,7 @@ public abstract class QueryOperator implements Iterable<Record> {
 
     /**
      * Creates a QueryOperator without a set source, destination, or schema.
+     *
      * @param type the operator's type (Join, Project, Select, etc...)
      */
     public QueryOperator(OperatorType type) {
@@ -46,7 +48,8 @@ public abstract class QueryOperator implements Iterable<Record> {
     /**
      * Creates a QueryOperator with a set source, and computes the output schema
      * accordingly.
-     * @param type the operator's type (Join, Project, Select, etc...)
+     *
+     * @param type   the operator's type (Join, Project, Select, etc...)
      * @param source the source operator
      */
     protected QueryOperator(OperatorType type, QueryOperator source) {
@@ -141,6 +144,7 @@ public abstract class QueryOperator implements Iterable<Record> {
 
     /**
      * Computes the schema of this operator's output records.
+     *
      * @return a schema matching the schema of the records of the iterator
      * obtained by calling .iterator()
      */
@@ -160,20 +164,20 @@ public abstract class QueryOperator implements Iterable<Record> {
     }
 
     /**
-     * @throws UnsupportedOperationException if this operator doesn't support
-     * backtracking
      * @return A backtracking iterator over the records of this operator
+     * @throws UnsupportedOperationException if this operator doesn't support
+     *                                       backtracking
      */
     public BacktrackingIterator<Record> backtrackingIterator() {
         throw new UnsupportedOperationException(
-            "This operator doesn't support backtracking. You may want to " +
-            "use QueryOperator.materialize on it first."
+                "This operator doesn't support backtracking. You may want to " +
+                        "use QueryOperator.materialize on it first."
         );
     }
 
     /**
-     * @param records an iterator of records
-     * @param schema the schema of the records yielded from `records`
+     * @param records  an iterator of records
+     * @param schema   the schema of the records yielded from `records`
      * @param maxPages the maximum number of pages worth of records to consume
      * @return This method will consume up to `maxPages` pages of records from
      * `records` (advancing it in the process) and return a backtracking
@@ -191,7 +195,7 @@ public abstract class QueryOperator implements Iterable<Record> {
     }
 
     /**
-     * @param operator a query operator to materialize
+     * @param operator    a query operator to materialize
      * @param transaction the transaction the materialized table will be created
      *                    within
      * @return A new MaterializedOperator that draws from the records of `operator`

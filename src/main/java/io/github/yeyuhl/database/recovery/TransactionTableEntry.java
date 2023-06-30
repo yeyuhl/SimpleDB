@@ -26,7 +26,7 @@ class TransactionTableEntry {
     long getSavepoint(String name) {
         if (!savepoints.containsKey(name)) {
             throw new NoSuchElementException("transaction " + transaction.getTransNum() + " has no savepoint " +
-                                             name);
+                    name);
         }
         return savepoints.get(name);
     }
@@ -34,19 +34,23 @@ class TransactionTableEntry {
     void deleteSavepoint(String name) {
         if (!savepoints.containsKey(name)) {
             throw new NoSuchElementException("transaction " + transaction.getTransNum() + " has no savepoint " +
-                                             name);
+                    name);
         }
         savepoints.remove(name);
     }
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) { return true; }
-        if (o == null || getClass() != o.getClass()) { return false; }
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         TransactionTableEntry that = (TransactionTableEntry) o;
         return lastLSN == that.lastLSN &&
-               Objects.equals(transaction, that.transaction) &&
-               Objects.equals(savepoints, that.savepoints);
+                Objects.equals(transaction, that.transaction) &&
+                Objects.equals(savepoints, that.savepoints);
     }
 
     @Override
@@ -57,8 +61,8 @@ class TransactionTableEntry {
     @Override
     public String toString() {
         return "TransactionTableEntry{" +
-               "transaction=" + transaction +
-               ", lastLSN=" + lastLSN +
-               '}';
+                "transaction=" + transaction +
+                ", lastLSN=" + lastLSN +
+                '}';
     }
 }

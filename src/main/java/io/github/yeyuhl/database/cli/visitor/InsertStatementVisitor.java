@@ -8,10 +8,12 @@ import io.github.yeyuhl.database.cli.parser.ASTLiteral;
 import io.github.yeyuhl.database.databox.DataBox;
 import io.github.yeyuhl.database.table.Record;
 
+
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 
-public class InsertStatementVisitor extends StatementVisitor {
+class InsertStatementVisitor extends StatementVisitor {
     public String tableName;
     public List<Record> values = new ArrayList<>();
 
@@ -34,15 +36,15 @@ public class InsertStatementVisitor extends StatementVisitor {
     }
 
     @Override
-    public void execute(Transaction transaction) {
+    public void execute(Transaction transaction, PrintStream out) {
         try {
             for (Record record: values) {
                 transaction.insert(this.tableName, record);
             }
-            System.out.println("INSERT");
+            out.println("INSERT");
         } catch (Exception e) {
-            System.out.println(e.getMessage());
-            System.out.println("Failed to execute INSERT.");
+            out.println(e.getMessage());
+            out.println("Failed to execute INSERT.");
         }
     }
 

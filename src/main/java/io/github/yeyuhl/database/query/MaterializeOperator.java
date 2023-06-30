@@ -9,11 +9,12 @@ public class MaterializeOperator extends SequentialScanOperator {
     /**
      * Operator that materializes the source operator into a temporary table immediately,
      * and then acts as a sequential scan operator over the temporary table.
-     * @param source source operator to be materialized
+     *
+     * @param source      source operator to be materialized
      * @param transaction current running transaction
      */
     public MaterializeOperator(QueryOperator source,
-                        TransactionContext transaction) {
+                               TransactionContext transaction) {
         super(OperatorType.MATERIALIZE, transaction, materializeToTable(source, transaction));
         setSource(source);
         setOutputSchema(source.getSchema());

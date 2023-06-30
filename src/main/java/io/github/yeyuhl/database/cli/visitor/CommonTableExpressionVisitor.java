@@ -14,7 +14,8 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-public class CommonTableExpressionVisitor extends RookieParserDefaultVisitor {
+
+class CommonTableExpressionVisitor extends RookieParserDefaultVisitor {
     String name = null;
     String alias = null;
     List<String> columns = new ArrayList<>();
@@ -39,12 +40,7 @@ public class CommonTableExpressionVisitor extends RookieParserDefaultVisitor {
             }
         }
         TransactionContext tc = transaction.getTransactionContext();
-        TransactionContext.setTransaction(tc);
-        try {
-            this.alias = tc.createTempTable(schema);
-        } finally {
-            TransactionContext.unsetTransaction();
-        }
+        this.alias = tc.createTempTable(schema);
         return this.alias;
     }
 

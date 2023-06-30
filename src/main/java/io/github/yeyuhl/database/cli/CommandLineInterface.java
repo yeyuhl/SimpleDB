@@ -3,6 +3,7 @@ package io.github.yeyuhl.database.cli;
 import io.github.yeyuhl.database.Database;
 import io.github.yeyuhl.database.DatabaseException;
 import io.github.yeyuhl.database.Transaction;
+import io.github.yeyuhl.database.TransactionContext;
 import io.github.yeyuhl.database.cli.parser.ASTSQLStatementList;
 import io.github.yeyuhl.database.cli.parser.ParseException;
 import io.github.yeyuhl.database.cli.parser.RookieParser;
@@ -16,30 +17,23 @@ import io.github.yeyuhl.database.table.Table;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public class CommandLineInterface {
-    private static String mascot = "\n\\|/  ___------___\n \\__|--%s______%s--|\n    |  %-9s |\n     ---______---\n";
-    private static int[] version = { 1, 8, 6 }; // {major, minor, build}
-    private static String label = "sp21";
-    private static Random generator = new Random();
+    private static final String MASCOT = "\n\\|/  ___------___\n \\__|--%s______%s--|\n    |  %-9s |\n     ---______---\n";
+    private static final int[] VERSION = { 1, 8, 6 }; // {major, minor, build}
+    private static final String LABEL = "sp23";
+
+    private InputStream in;
+    private PrintStream out; // Use instead of System.out to work across a network
+    private Database db;
+    private Random generator;
 
     public static void main(String args[]) throws IOException {
-        // startup sequence
-        boolean startup = false;
-        for (int i = 1; i < args.length; i++) {
-            if (args[i].equals("--startup"))
-                startup = true;
-        }
-        if (startup)
-            startup();
-
-        // Welcome message
-        System.out.printf(mascot, "o", "o", institution[generator.nextInt(institution.length)]);
-        System.out.printf("\nWelcome to RookieDB (v%d.%d.%d-%s)\n", version[0], version[1], version[2], label);
-
         // Basic database for project 0 through 3
         Database db = new Database("demo", 25);
         
@@ -51,9 +45,31 @@ public class CommandLineInterface {
 
         db.loadDemo();
 
+        CommandLineInterface cli = new CommandLineInterface(db);
+        cli.run();
+        db.close();
+    }
+
+    public CommandLineInterface(Database db) {
+        // By default, just use standard in and out
+        this(db, System.in, System.out);
+    }
+
+    public CommandLineInterface(Database db, InputStream in, PrintStream out) {
+        this.db = db;
+        this.in = in;
+        this.out = out;
+        this.generator = new Random();
+    }
+
+    public void run() {
+        // Welcome message
+        this.out.printf(MASCOT, "o", "o", institution[this.generator.nextInt(institution.length)]);
+        this.out.printf("\nWelcome to RookieDB (v%d.%d.%d-%s)\n", VERSION[0], VERSION[1], VERSION[2], LABEL);
+
         // REPL
         Transaction currTransaction = null;
-        Scanner inputScanner = new Scanner(System.in);
+        Scanner inputScanner = new Scanner(this.in);
         String input;
         while (true) {
             try {
@@ -64,7 +80,7 @@ public class CommandLineInterface {
                     try {
                         parseMetaCommand(input, db);
                     } catch (Exception e) {
-                        System.out.println(e.getMessage());
+                        this.out.println(e.getMessage());
                     }
                     continue;
                 }
@@ -77,9 +93,8 @@ public class CommandLineInterface {
                     currTransaction.rollback();
                     currTransaction.close();
                 }
-                System.out.println("exit");
-                db.close();
-                System.out.println("Bye!"); // If MariaDB says it so can we :)
+                this.out.println("exit");
+                this.out.println("Bye!"); // If MariaDB says it so can we :)
                 return;
             }
 
@@ -90,22 +105,22 @@ public class CommandLineInterface {
             try {
                 node = parser.sql_stmt_list();
             } catch (ParseException | TokenMgrError e) {
-                System.out.println("Parser exception: " + e.getMessage());
+                this.out.println("Parser exception: " + e.getMessage());
                 continue;
             }
-            StatementListVisitor visitor = new StatementListVisitor(db);
+            StatementListVisitor visitor = new StatementListVisitor(db, this.out);
             try {
                 node.jjtAccept(visitor, null);
                 currTransaction = visitor.execute(currTransaction);
             } catch (DatabaseException e) {
-                System.out.println("Database exception: " + e.getMessage());
+                this.out.println("Database exception: " + e.getMessage());
             }
         }
     }
 
-    public static String bufferUserInput(Scanner s) {
+    public String bufferUserInput(Scanner s) {
         int numSingleQuote = 0;
-        System.out.print("=> ");
+        this.out.print("=> ");
         StringBuilder result = new StringBuilder();
         boolean firstLine = true;
         do {
@@ -128,9 +143,9 @@ public class CommandLineInterface {
             result.append(curr);
 
             if (numSingleQuote % 2 != 0)
-                System.out.print("'> ");
+                this.out.print("'> ");
             else if (!curr.trim().endsWith(";"))
-                System.out.print("-> ");
+                this.out.print("-> ");
             else
                 break;
             firstLine = false;
@@ -138,31 +153,48 @@ public class CommandLineInterface {
         return result.toString();
     }
 
-    private static void parseMetaCommand(String input, Database db) {
+    private void printTable(String tableName) {
+        TransactionContext t = TransactionContext.getTransaction();
+        Table table = t.getTable(tableName);
+        if (table == null) {
+            this.out.printf("No table \"%s\" found.", tableName);
+            return;
+        }
+        this.out.printf("Table \"%s\"\n", tableName);
+        Schema s = table.getSchema();
+        new PrettyPrinter(out).printSchema(s);
+    }
+
+    private void parseMetaCommand(String input, Database db) {
         input = input.substring(1); // Shave off the initial slash
         String[] tokens = input.split("\\s+");
         String cmd = tokens[0];
+        TransactionContext tc = TransactionContext.getTransaction();
         if (cmd.equals("d")) {
             if (tokens.length == 1) {
                 List<Record> records = db.scanTableMetadataRecords();
-                PrettyPrinter.printRecords(db.getTableInfoSchema().getFieldNames(),
+                new PrettyPrinter(out).printRecords(db.getTableInfoSchema().getFieldNames(),
                         records.iterator());
             } else if (tokens.length == 2) {
                 String tableName = tokens[1];
-                Transaction t = db.beginTransaction();
-                Table table = t.getTransactionContext().getTable(tableName);
-                if (table == null) {
-                    System.out.printf("No table \"%s\" found.", tableName);
-                    return;
+                if (tc == null) {
+                    try (Transaction t = db.beginTransaction()) {
+                        printTable(tableName);
+                    }
+                } else {
+                    printTable(tableName);
                 }
-                System.out.printf("Table \"%s\"\n", tableName);
-                Schema s = table.getSchema();
-                PrettyPrinter.printSchema(s);
             }
         } else if (cmd.equals("di")) {
             List<Record> records = db.scanIndexMetadataRecords();
-            PrettyPrinter.printRecords(db.getIndexInfoSchema().getFieldNames(),
+            new PrettyPrinter(out).printRecords(db.getIndexInfoSchema().getFieldNames(),
                     records.iterator());
+        } else if (cmd.equals("locks")) {
+            if (tc == null) {
+                this.out.println("No locks held, because not currently in a transaction.");
+            } else {
+                this.out.println(db.getLockManager().getLocks(tc));
+            }
         } else {
             throw new IllegalArgumentException(String.format(
                 "`%s` is not a valid metacommand",
@@ -187,52 +219,52 @@ public class CommandLineInterface {
                     "Distributing face masks", "Joining Zoom meetings", "Caching out of the stock market",
                     "Advising transactions to self-isolate", "Tweaking the quarantine optimizer");
 
-    private static void startup() {
+    private void startup() {
         Collections.shuffle(startupMessages);
         Collections.shuffle(startupProblems);
-        System.out.printf("Starting RookieDB (v%d.%d.%d-%s)\n", version[0], version[1], version[2], label);
+        this.out.printf("Starting RookieDB (v%d.%d.%d-%s)\n", VERSION[0], VERSION[1], VERSION[2], LABEL);
         sleep(100);
         for (int i = 0; i < 3; i++) {
-            System.out.print(" > " + startupMessages.get(i));
+            this.out.print(" > " + startupMessages.get(i));
             ellipses();
             sleep(100);
             if (i < 4) {
-                System.out.print(" Done");
+                this.out.print(" Done");
             } else {
                 ellipses();
-                System.out.print(" Error!");
+                this.out.print(" Error!");
                 sleep(125);
             }
             sleep(75);
-            System.out.println();
+            this.out.println();
         }
-        System.out.println("\nEncountered unexpected problems! Applying fixes:");
+        this.out.println("\nEncountered unexpected problems! Applying fixes:");
         sleep(100);
         for (int i = 0; i < 3; i++) {
-            System.out.print(" > " + startupProblems.get(i));
+            this.out.print(" > " + startupProblems.get(i));
             ellipses();
-            System.out.print(" Done");
+            this.out.print(" Done");
             sleep(75);
-            System.out.println();
+            this.out.println();
         }
         sleep(100);
-        System.out.println();
-        System.out.println("Initialization succeeded!");
-        System.out.println();
+        this.out.println();
+        this.out.println("Initialization succeeded!");
+        this.out.println();
     }
 
-    private static void ellipses() {
+    private void ellipses() {
         for (int i = 0; i < 3; i++) {
-            System.out.print(".");
-            sleep(25 + generator.nextInt(50));
+            this.out.print(".");
+            sleep(25 + this.generator.nextInt(50));
         }
     }
 
-    private static void sleep(int timeMilliseconds) {
+    private void sleep(int timeMilliseconds) {
         try {
             TimeUnit.MILLISECONDS.sleep(timeMilliseconds);
         } catch (InterruptedException e) {
-            System.out.println("Interrupt signal received.");
+            this.out.println("Interrupt signal received.");
         }
     }
 }

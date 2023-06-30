@@ -7,19 +7,22 @@ import io.github.yeyuhl.database.common.Pair;
 import io.github.yeyuhl.database.common.PredicateOperator;
 import io.github.yeyuhl.database.databox.DataBox;
 import io.github.yeyuhl.database.query.QueryPlan;
-import io.github.yeyuhl.database.query.aggr.DataFunction;
+
+import io.github.yeyuhl.database.query.expr.Expression;
+import io.github.yeyuhl.database.query.expr.ExpressionVisitor;
 import io.github.yeyuhl.database.table.Record;
 import io.github.yeyuhl.database.table.Schema;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
-public class SelectStatementVisitor extends StatementVisitor {
+class SelectStatementVisitor extends StatementVisitor {
     List<String> selectColumns = new ArrayList<>();
     List<String> selectAliases = new ArrayList<>();
-    List<DataFunction> selectFunctions = new ArrayList<>();
+    List<Expression> selectFunctions = new ArrayList<>();
     List<String> tableNames = new ArrayList<>();
     List<String> tableAliases = new ArrayList<>();
     List<String> joinedTableLeftCols = new ArrayList<>();
@@ -35,10 +38,10 @@ public class SelectStatementVisitor extends StatementVisitor {
     int offset = 0;
 
     @Override
-    public void execute(Transaction transaction) {
+    public void execute(Transaction transaction, PrintStream out) {
         QueryPlan query = getQueryPlan(transaction).get();
         Iterator<Record> records = query.execute();
-        PrettyPrinter.printRecords(selectColumns, records);
+        new PrettyPrinter(out).printRecords(selectColumns, records);
     }
 
     @Override
@@ -69,7 +72,7 @@ public class SelectStatementVisitor extends StatementVisitor {
             );
         }
         ArrayList<String> expandedColumns = new ArrayList<>();
-        ArrayList<DataFunction> expandedFunctions = new ArrayList<>();
+        ArrayList<Expression> expandedFunctions = new ArrayList<>();
         ArrayList<String> expandedAliases = new ArrayList<>();
         for (int i = 0; i < selectColumns.size(); i++) {
             String name = selectColumns.get(i);
@@ -83,7 +86,7 @@ public class SelectStatementVisitor extends StatementVisitor {
                     for (String colName : s.getFieldNames()) {
                         String qualifiedName = (tableAliases.size() > 1 ? alias + "." : "") + colName;
                         expandedColumns.add(qualifiedName);
-                        expandedFunctions.add(new DataFunction.ColumnDataSource(qualifiedName));
+                        expandedFunctions.add(Expression.column(qualifiedName));
                         expandedAliases.add(null);
                     }
                 }
@@ -99,7 +102,7 @@ public class SelectStatementVisitor extends StatementVisitor {
                     for (String colName : schema.getFieldNames()) {
                         String qualifiedName = s[0] + "." + colName;
                         expandedColumns.add(qualifiedName);
-                        expandedFunctions.add(new DataFunction.ColumnDataSource(qualifiedName));
+                        expandedFunctions.add(Expression.column(qualifiedName));
                         expandedAliases.add(null);
                     }
                 }
@@ -165,8 +168,9 @@ public class SelectStatementVisitor extends StatementVisitor {
     public void visit(ASTExpression node, Object data) {
         ExpressionVisitor visitor = new ExpressionVisitor();
         node.jjtAccept(visitor, data);
-        this.selectFunctions.add(visitor.build());
-        this.selectColumns.add(visitor.getName(node));
+        Expression exp = visitor.build();
+        this.selectFunctions.add(exp);
+        this.selectColumns.add(exp.toString());
     }
 
     @Override

@@ -6,6 +6,7 @@ import io.github.yeyuhl.database.table.Record;
 import io.github.yeyuhl.database.table.Schema;
 import io.github.yeyuhl.database.table.stats.TableStats;
 
+
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -19,15 +20,15 @@ public class SelectOperator extends QueryOperator {
      * Creates a new SelectOperator that pulls from source and only returns tuples for which the
      * predicate is satisfied.
      *
-     * @param source the source of this operator
+     * @param source     the source of this operator
      * @param columnName the name of the column to evaluate the predicate on
-     * @param operator the actual comparator
-     * @param value the value to compare against
+     * @param operator   the actual comparator
+     * @param value      the value to compare against
      */
     public SelectOperator(QueryOperator source,
-                   String columnName,
-                   PredicateOperator operator,
-                   DataBox value) {
+                          String columnName,
+                          PredicateOperator operator,
+                          DataBox value) {
         super(OperatorType.SELECT, source);
         this.operator = operator;
         this.value = value;
@@ -63,8 +64,8 @@ public class SelectOperator extends QueryOperator {
     public TableStats estimateStats() {
         TableStats stats = this.getSource().estimateStats();
         return stats.copyWithPredicate(this.columnIndex,
-                                       this.operator,
-                                       this.value);
+                this.operator,
+                this.value);
     }
 
     @Override
@@ -73,7 +74,9 @@ public class SelectOperator extends QueryOperator {
     }
 
     @Override
-    public Iterator<Record> iterator() { return new SelectIterator(); }
+    public Iterator<Record> iterator() {
+        return new SelectIterator();
+    }
 
     /**
      * An implementation of Iterator that provides an iterator interface for this operator.
@@ -100,50 +103,50 @@ public class SelectOperator extends QueryOperator {
             while (this.sourceIterator.hasNext()) {
                 Record r = this.sourceIterator.next();
                 switch (SelectOperator.this.operator) {
-                case EQUALS:
-                    if (r.getValue(SelectOperator.this.columnIndex).equals(value)) {
-                        this.nextRecord = r;
-                        return true;
-                    }
-                    break;
-                case NOT_EQUALS:
-                    if (!r.getValue(SelectOperator.this.columnIndex).equals(value)) {
-                        this.nextRecord = r;
-                        return true;
-                    }
-                    break;
-                case LESS_THAN:
-                    if (r.getValue(SelectOperator.this.columnIndex).compareTo(value) < 0) {
-                        this.nextRecord = r;
-                        return true;
-                    }
-                    break;
-                case LESS_THAN_EQUALS:
-                    if (r.getValue(SelectOperator.this.columnIndex).compareTo(value) < 0) {
-                        this.nextRecord = r;
-                        return true;
-                    } else if (r.getValue(SelectOperator.this.columnIndex).compareTo(value) == 0) {
-                        this.nextRecord = r;
-                        return true;
-                    }
-                    break;
-                case GREATER_THAN:
-                    if (r.getValue(SelectOperator.this.columnIndex).compareTo(value) > 0) {
-                        this.nextRecord = r;
-                        return true;
-                    }
-                    break;
-                case GREATER_THAN_EQUALS:
-                    if (r.getValue(SelectOperator.this.columnIndex).compareTo(value) > 0) {
-                        this.nextRecord = r;
-                        return true;
-                    } else if (r.getValue(SelectOperator.this.columnIndex).compareTo(value) == 0) {
-                        this.nextRecord = r;
-                        return true;
-                    }
-                    break;
-                default:
-                    break;
+                    case EQUALS:
+                        if (r.getValue(SelectOperator.this.columnIndex).equals(value)) {
+                            this.nextRecord = r;
+                            return true;
+                        }
+                        break;
+                    case NOT_EQUALS:
+                        if (!r.getValue(SelectOperator.this.columnIndex).equals(value)) {
+                            this.nextRecord = r;
+                            return true;
+                        }
+                        break;
+                    case LESS_THAN:
+                        if (r.getValue(SelectOperator.this.columnIndex).compareTo(value) < 0) {
+                            this.nextRecord = r;
+                            return true;
+                        }
+                        break;
+                    case LESS_THAN_EQUALS:
+                        if (r.getValue(SelectOperator.this.columnIndex).compareTo(value) < 0) {
+                            this.nextRecord = r;
+                            return true;
+                        } else if (r.getValue(SelectOperator.this.columnIndex).compareTo(value) == 0) {
+                            this.nextRecord = r;
+                            return true;
+                        }
+                        break;
+                    case GREATER_THAN:
+                        if (r.getValue(SelectOperator.this.columnIndex).compareTo(value) > 0) {
+                            this.nextRecord = r;
+                            return true;
+                        }
+                        break;
+                    case GREATER_THAN_EQUALS:
+                        if (r.getValue(SelectOperator.this.columnIndex).compareTo(value) > 0) {
+                            this.nextRecord = r;
+                            return true;
+                        } else if (r.getValue(SelectOperator.this.columnIndex).compareTo(value) == 0) {
+                            this.nextRecord = r;
+                            return true;
+                        }
+                        break;
+                    default:
+                        break;
                 }
             }
             return false;

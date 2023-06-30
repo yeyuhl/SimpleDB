@@ -111,7 +111,13 @@ public class RookieParserDefaultVisitor implements RookieParserVisitor{
   public void visit(ASTComparisonOperator node, Object data){
     defaultVisit(node, data);
   }
-  public void visit(ASTLogicalOperator node, Object data){
+  public void visit(ASTOrOperator node, Object data){
+    defaultVisit(node, data);
+  }
+  public void visit(ASTAndOperator node, Object data){
+    defaultVisit(node, data);
+  }
+  public void visit(ASTNotOperator node, Object data){
     defaultVisit(node, data);
   }
   public void visit(ASTMultiplicativeOperator node, Object data){
@@ -123,7 +129,13 @@ public class RookieParserDefaultVisitor implements RookieParserVisitor{
   public void visit(ASTExpression node, Object data){
     defaultVisit(node, data);
   }
-  public void visit(ASTLogicalExpression node, Object data){
+  public void visit(ASTOrExpression node, Object data){
+    defaultVisit(node, data);
+  }
+  public void visit(ASTAndExpression node, Object data){
+    defaultVisit(node, data);
+  }
+  public void visit(ASTNotExpression node, Object data){
     defaultVisit(node, data);
   }
   public void visit(ASTComparisonExpression node, Object data){
@@ -142,4 +154,4 @@ public class RookieParserDefaultVisitor implements RookieParserVisitor{
     defaultVisit(node, data);
   }
 }
-/* JavaCC - OriginalChecksum=fe82cbcccc3d9be526b69ed82a26672b (do not edit this line) */
+/* JavaCC - OriginalChecksum=bfc1abc56c56149d14ed9654715639ba (do not edit this line) */

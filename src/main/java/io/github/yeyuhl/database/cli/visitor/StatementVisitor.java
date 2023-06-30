@@ -4,10 +4,11 @@ import io.github.yeyuhl.database.Transaction;
 import io.github.yeyuhl.database.cli.parser.RookieParserDefaultVisitor;
 import io.github.yeyuhl.database.query.QueryPlan;
 
+import java.io.PrintStream;
 import java.util.Optional;
 
-public abstract class StatementVisitor extends RookieParserDefaultVisitor {
-    public void execute(Transaction transaction) {
+abstract class StatementVisitor extends RookieParserDefaultVisitor {
+    public void execute(Transaction transaction, PrintStream out) {
         throw new UnsupportedOperationException("Statement is not executable.");
     }
 

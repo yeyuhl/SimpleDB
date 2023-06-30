@@ -8,8 +8,12 @@ import io.github.yeyuhl.database.table.Record;
 import io.github.yeyuhl.database.table.Schema;
 import io.github.yeyuhl.database.table.stats.TableStats;
 
+
 import java.util.*;
 
+/**
+ * 排序运算符，按照指定列对记录进行排序
+ */
 public class SortOperator extends QueryOperator {
     protected Comparator<Record> comparator;
     private TransactionContext transaction;
@@ -48,9 +52,9 @@ public class SortOperator extends QueryOperator {
     @Override
     public int estimateIOCost() {
         int N = getSource().estimateStats().getNumPages();
-        double pass0Runs = Math.ceil(N / numBuffers);
+        double pass0Runs = Math.ceil(N / (double) numBuffers);
         double numPasses = 1 + Math.ceil(Math.log(pass0Runs) / Math.log(numBuffers - 1));
-        return (int) (2 * N * numPasses);
+        return (int) (2 * N * numPasses) + getSource().estimateIOCost();
     }
 
     @Override
@@ -64,7 +68,9 @@ public class SortOperator extends QueryOperator {
     }
 
     @Override
-    public boolean materialized() { return true; }
+    public boolean materialized() {
+        return true;
+    }
 
     @Override
     public BacktrackingIterator<Record> backtrackingIterator() {
@@ -78,37 +84,58 @@ public class SortOperator extends QueryOperator {
     }
 
     /**
-     * Returns a Run containing records from the input iterator in sorted order.
-     * You're free to use an in memory sort over all the records using one of
-     * Java's built-in sorting methods.
+     * run本质上是一个迭代器，不过存储的是排好序的records，排序可以直接用Java自带的sort来实现
      *
-     * @return a single sorted run containing all the records from the input
-     * iterator
+     * @return 一个排序好的run，包含来自输入迭代器的所有records
      */
     public Run sortRun(Iterator<Record> records) {
-        // TODO(proj3_part1): implement
-        return null;
+        Run sortedRun = new Run(transaction, getSchema());
+        List<Record> listRecords = new ArrayList<>();
+        while (records.hasNext()) {
+            listRecords.add(records.next());
+        }
+        listRecords.sort(new RecordComparator());
+        sortedRun.addAll(listRecords);
+        return sortedRun;
     }
 
     /**
-     * Given a list of sorted runs, returns a new run that is the result of
-     * merging the input runs. You should use a Priority Queue (java.util.PriorityQueue)
-     * to determine which record should be should be added to the output run
-     * next.
+     * 给定一个包含有序的runs的列表，返回一个新的run，该run是合并输入runs的结果
+     * 应该使用一个优先队列（PriorityQueue）来决定哪个record应该被添加到下一个输出run中
+     * <p>
+     * 优先队列中不允许有超过runs.size()条records，建议优先队列中存储Pair<Record, Integer>对象
+     * 其中Pair(r, i)表示是来自run i的Record r，且r是当前未合并的run中最小的值，i可用于定位下一个要添加到队列中的record
      *
-     * You are NOT allowed to have more than runs.size() records in your
-     * priority queue at a given moment. It is recommended that your Priority
-     * Queue hold Pair<Record, Integer> objects where a Pair (r, i) is the
-     * Record r with the smallest value you are sorting on currently unmerged
-     * from run i. `i` can be useful to locate which record to add to the queue
-     * next after the smallest element is removed.
-     *
-     * @return a single sorted run obtained by merging the input runs
+     * @return 通过合并输入runs获得一个排好序的run
      */
     public Run mergeSortedRuns(List<Run> runs) {
         assert (runs.size() <= this.numBuffers - 1);
-        // TODO(proj3_part1): implement
-        return null;
+        Run sortedRun = new Run(transaction, getSchema());
+        List<BacktrackingIterator<Record>> iters = new ArrayList<>();
+        for (Run run : runs) {
+            iters.add(run.iterator());
+        }
+        PriorityQueue<Pair<Record, Integer>> priorityQueue = new PriorityQueue<>(runs.size(), new RecordPairComparator());
+        for (int i = 0; i < iters.size(); i++) {
+            // 保证每个run都有一个record被添加到优先队列中且是最小的
+            if (iters.get(i).hasNext()) {
+                priorityQueue.add(new Pair<>(iters.get(i).next(), i));
+            }
+        }
+        while (!priorityQueue.isEmpty()) {
+            // 每次从优先队列中取出最小的record，添加到sortedRun中
+            Pair<Record, Integer> pair = priorityQueue.poll();
+            Record r = pair.getFirst();
+            int i = pair.getSecond();
+            sortedRun.add(r);
+            // 由于i的最小record从优先队列中移除了，因此如果run i还有record，将其添加到优先队列中
+            if (iters.get(i).hasNext()) {
+                priorityQueue.add(new Pair<>(iters.get(i).next(), i));
+            } else {
+                continue;
+            }
+        }
+        return sortedRun;
     }
 
     /**
@@ -124,32 +151,40 @@ public class SortOperator extends QueryOperator {
     }
 
     /**
-     * Given a list of N sorted runs, returns a list of sorted runs that is the
-     * result of merging (numBuffers - 1) of the input runs at a time. If N is
-     * not a perfect multiple of (numBuffers - 1) the last sorted run should be
-     * the result of merging less than (numBuffers - 1) runs.
+     * 给定一个包含N个有序的runs的列表，返回一个有序的runs的列表，即把列表里的runs合并了一部分
+     * 该列表是通过每次合并(numBuffers - 1)个输入runs得到的，如果N不是(numBuffers - 1)的完美倍数，那么最后一个有序的run应该是合并少于(numBuffers - 1)个runs的得到的
      *
-     * @return a list of sorted runs obtained by merging the input runs
+     * @return 通过合并输入runs获得一个包含有序的runs的列表
      */
     public List<Run> mergePass(List<Run> runs) {
-        // TODO(proj3_part1): implement
-        return Collections.emptyList();
+        List<Run> mergedRuns = new ArrayList<>();
+        int len = runs.size();
+        int size = this.numBuffers - 1;
+        // 每次合并(numBuffers - 1)个输入runs
+        for (int i = 0; i + size <= len; i += size) {
+            mergedRuns.add(mergeSortedRuns(runs.subList(i, Math.min(i + size, len))));
+        }
+        return mergedRuns;
     }
 
     /**
-     * Does an external merge sort over the records of the source operator.
-     * You may find the getBlockIterator method of the QueryOperator class useful
-     * here to create your initial set of sorted runs.
+     * 外部合并排序算法的实现
      *
-     * @return a single run containing all of the source operator's records in
-     * sorted order.
+     * @return 一个包含源运算符所有records的有序的run
      */
     public Run sort() {
         // Iterator over the records of the relation we want to sort
         Iterator<Record> sourceIterator = getSource().iterator();
-
-        // TODO(proj3_part1): implement
-        return makeRun(); // TODO(proj3_part1): replace this!
+        List<Run> sortedRuns = new ArrayList<>();
+        while (sourceIterator.hasNext()) {
+            // getBlockIterator方法返回一个包含numBuffers个records的迭代器
+            sortedRuns.add(sortRun(getBlockIterator(sourceIterator, getSchema(), numBuffers)));
+        }
+        // 通过mergePass方法合并runs，合并到最后只剩下一个run
+        while (sortedRuns.size() > 1) {
+            sortedRuns = mergePass(sortedRuns);
+        }
+        return sortedRuns.get(0);
     }
 
     /**

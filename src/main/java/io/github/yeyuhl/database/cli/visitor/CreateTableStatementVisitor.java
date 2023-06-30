@@ -11,11 +11,13 @@ import io.github.yeyuhl.database.query.QueryPlan;
 import io.github.yeyuhl.database.table.Record;
 import io.github.yeyuhl.database.table.Schema;
 
+
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-public class CreateTableStatementVisitor extends StatementVisitor {
+class CreateTableStatementVisitor extends StatementVisitor {
     public String tableName;
     public List<String> errorMessages = new ArrayList<>();
     public Schema schema = new Schema();
@@ -77,13 +79,13 @@ public class CreateTableStatementVisitor extends StatementVisitor {
         schema.add(fieldName, fieldType);
     }
 
-    public void execute(Transaction transaction) {
+    public void execute(Transaction transaction, PrintStream out) {
         // transaction
         if (this.errorMessages.size() > 0) {
             for(String msg: errorMessages) {
-                System.out.println(msg);
+                out.println(msg);
             }
-            System.out.println("Failed to execute CREATE TABLE.");
+            out.println("Failed to execute CREATE TABLE.");
         } else {
             if (selectStatementVisitor != null) {
                 QueryPlan p = selectStatementVisitor.getQueryPlan(transaction).get();
@@ -104,7 +106,7 @@ public class CreateTableStatementVisitor extends StatementVisitor {
             } else {
                 transaction.createTable(this.schema, this.tableName);
             }
-            System.out.println("CREATE TABLE " + tableName);
+            out.println("CREATE TABLE " + tableName);
         }
     }
 

@@ -99,7 +99,7 @@ class InnerNode extends BPlusNode {
     public LeafNode getLeftmostLeaf() {
         assert (children.size() > 0);
         BPlusNode leftMostLeaf = BPlusNode.fromBytes(metadata, bufferManager, treeContext, children.get(0));
-        return null;
+        return leftMostLeaf.getLeftmostLeaf();
     }
 
     /**

@@ -3,7 +3,10 @@ package io.github.yeyuhl.database.cli.visitor;
 import io.github.yeyuhl.database.Transaction;
 import io.github.yeyuhl.database.cli.parser.ASTReleaseStatement;
 
-public class ReleaseStatementVisitor extends StatementVisitor {
+
+import java.io.PrintStream;
+
+class ReleaseStatementVisitor extends StatementVisitor {
     public String savepointName;
 
     @Override
@@ -12,13 +15,13 @@ public class ReleaseStatementVisitor extends StatementVisitor {
     }
 
     @Override
-    public void execute(Transaction transaction) {
+    public void execute(Transaction transaction, PrintStream out) {
         try {
             transaction.releaseSavepoint(savepointName);
-            System.out.println("RELEASE SAVEPOINT " + savepointName);
+            out.println("RELEASE SAVEPOINT " + savepointName);
         } catch (Exception e) {
-            System.out.println(e.getMessage());
-            System.out.println("Failed to execute RELEASE SAVEPOINT.");
+            out.println(e.getMessage());
+            out.println("Failed to execute RELEASE SAVEPOINT.");
         }
     }
 

@@ -3,7 +3,10 @@ package io.github.yeyuhl.database.cli.visitor;
 import io.github.yeyuhl.database.Transaction;
 import io.github.yeyuhl.database.cli.parser.ASTIdentifier;
 
-public class DropTableStatementVisitor extends StatementVisitor {
+
+import java.io.PrintStream;
+
+class DropTableStatementVisitor extends StatementVisitor {
     public String tableName;
 
     @Override
@@ -12,13 +15,13 @@ public class DropTableStatementVisitor extends StatementVisitor {
     }
 
     @Override
-    public void execute(Transaction transaction) {
+    public void execute(Transaction transaction, PrintStream out) {
         try {
             transaction.dropTable(this.tableName);
-            System.out.println("DROP TABLE " + this.tableName + ";");
+            out.println("DROP TABLE " + this.tableName + ";");
         } catch (Exception e) {
-            System.out.println(e.getMessage());
-            System.out.println("Failed to execute DROP TABLE.");
+            out.println(e.getMessage());
+            out.println("Failed to execute DROP TABLE.");
         }
     }
 

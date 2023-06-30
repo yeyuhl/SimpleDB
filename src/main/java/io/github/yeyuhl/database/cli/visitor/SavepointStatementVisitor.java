@@ -3,7 +3,10 @@ package io.github.yeyuhl.database.cli.visitor;
 import io.github.yeyuhl.database.Transaction;
 import io.github.yeyuhl.database.cli.parser.ASTIdentifier;
 
-public class SavepointStatementVisitor extends StatementVisitor {
+
+import java.io.PrintStream;
+
+class SavepointStatementVisitor extends StatementVisitor {
     public String savepointName;
 
     @Override
@@ -12,8 +15,8 @@ public class SavepointStatementVisitor extends StatementVisitor {
     }
 
     @Override
-    public void execute(Transaction t) {
-        t.savepoint(savepointName);
+    public void execute(Transaction transaction, PrintStream out) {
+        transaction.savepoint(savepointName);
     }
 
     @Override

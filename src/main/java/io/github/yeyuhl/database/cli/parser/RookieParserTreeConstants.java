@@ -38,16 +38,20 @@ public interface RookieParserTreeConstants
   public int JJTINTEGERLITERAL = 32;
   public int JJTLITERAL = 33;
   public int JJTCOMPARISONOPERATOR = 34;
-  public int JJTLOGICALOPERATOR = 35;
-  public int JJTMULTIPLICATIVEOPERATOR = 36;
-  public int JJTADDITIVEOPERATOR = 37;
-  public int JJTEXPRESSION = 38;
-  public int JJTLOGICALEXPRESSION = 39;
-  public int JJTCOMPARISONEXPRESSION = 40;
-  public int JJTADDITIVEEXPRESSION = 41;
-  public int JJTMULTIPLICATIVEEXPRESSION = 42;
-  public int JJTFUNCTIONCALLEXPRESSION = 43;
-  public int JJTPRIMARYEXPRESSION = 44;
+  public int JJTOROPERATOR = 35;
+  public int JJTANDOPERATOR = 36;
+  public int JJTNOTOPERATOR = 37;
+  public int JJTMULTIPLICATIVEOPERATOR = 38;
+  public int JJTADDITIVEOPERATOR = 39;
+  public int JJTEXPRESSION = 40;
+  public int JJTOREXPRESSION = 41;
+  public int JJTANDEXPRESSION = 42;
+  public int JJTNOTEXPRESSION = 43;
+  public int JJTCOMPARISONEXPRESSION = 44;
+  public int JJTADDITIVEEXPRESSION = 45;
+  public int JJTMULTIPLICATIVEEXPRESSION = 46;
+  public int JJTFUNCTIONCALLEXPRESSION = 47;
+  public int JJTPRIMARYEXPRESSION = 48;
 
   public String[] jjtNodeName = {
     "SQLStatementList",
@@ -85,11 +89,15 @@ public interface RookieParserTreeConstants
     "IntegerLiteral",
     "Literal",
     "ComparisonOperator",
-    "LogicalOperator",
+    "OrOperator",
+    "AndOperator",
+    "NotOperator",
     "MultiplicativeOperator",
     "AdditiveOperator",
     "Expression",
-    "LogicalExpression",
+    "OrExpression",
+    "AndExpression",
+    "NotExpression",
     "ComparisonExpression",
     "AdditiveExpression",
     "MultiplicativeExpression",
@@ -97,4 +105,4 @@ public interface RookieParserTreeConstants
     "PrimaryExpression",
   };
 }
-/* JavaCC - OriginalChecksum=a489df6fdcb35f7b2ac1cdfa66199fcf (do not edit this line) */
+/* JavaCC - OriginalChecksum=7454a2bc0c1d9ffa919482951677c36d (do not edit this line) */

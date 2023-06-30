@@ -4,7 +4,10 @@ import io.github.yeyuhl.database.Transaction;
 import io.github.yeyuhl.database.cli.parser.ASTColumnName;
 import io.github.yeyuhl.database.cli.parser.ASTIdentifier;
 
-public class DropIndexStatementVisitor extends StatementVisitor {
+
+import java.io.PrintStream;
+
+class DropIndexStatementVisitor extends StatementVisitor {
     public String tableName;
     public String columnName;
 
@@ -19,13 +22,13 @@ public class DropIndexStatementVisitor extends StatementVisitor {
     }
 
     @Override
-    public void execute(Transaction transaction) {
+    public void execute(Transaction transaction, PrintStream out) {
         try {
             transaction.dropIndex(tableName, columnName);
-            System.out.printf("DROP INDEX %s(%s)\n", tableName, columnName);
+            out.printf("DROP INDEX %s(%s)\n", tableName, columnName);
         } catch (Exception e) {
-            System.out.println(e.getMessage());
-            System.out.println("Failed to execute DROP INDEX.");
+            out.println(e.getMessage());
+            out.println("Failed to execute DROP INDEX.");
         }
     }
 

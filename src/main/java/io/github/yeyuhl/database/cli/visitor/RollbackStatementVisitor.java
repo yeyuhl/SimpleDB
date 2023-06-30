@@ -7,7 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class RollbackStatementVisitor extends StatementVisitor {
+
+class RollbackStatementVisitor extends StatementVisitor {
     public String savepointName;
     public List<DataBox> values = new ArrayList<DataBox>();
 

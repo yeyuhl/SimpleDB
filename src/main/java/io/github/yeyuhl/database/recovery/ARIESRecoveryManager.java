@@ -57,8 +57,9 @@ public class ARIESRecoveryManager implements RecoveryManager {
      * block page evictions until the log has been flushed, but the recovery
      * manager needs to interface with the buffer manager to write the log and
      * redo changes).
+     *
      * @param diskSpaceManager disk space manager
-     * @param bufferManager buffer manager
+     * @param bufferManager    buffer manager
      */
     @Override
     public void setManagers(DiskSpaceManager diskSpaceManager, BufferManager bufferManager) {
@@ -71,7 +72,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * Called when a new transaction is started.
-     *
+     * <p>
      * The transaction should be added to the transaction table.
      *
      * @param transaction new transaction
@@ -83,7 +84,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * Called when a transaction is about to start committing.
-     *
+     * <p>
      * A commit record should be appended, the log should be flushed,
      * and the transaction table and the transaction status should be updated.
      *
@@ -98,7 +99,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * Called when a transaction is set to be aborted.
-     *
+     * <p>
      * An abort record should be appended, and the transaction table and
      * transaction status should be updated. Calling this function should not
      * perform any rollbacks.
@@ -116,7 +117,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
      * Called when a transaction is cleaning up; this should roll back
      * changes if the transaction is aborting (see the rollbackToLSN helper
      * function below).
-     *
+     * <p>
      * Any changes that need to be undone should be undone, the transaction should
      * be removed from the transaction table, the end record should be appended,
      * and the transaction status should be updated.
@@ -135,17 +136,17 @@ public class ARIESRecoveryManager implements RecoveryManager {
      * transaction's actions, up to (but not including) a certain LSN.
      * Starting with the LSN of the most recent record that hasn't been undone:
      * - while the current LSN is greater than the LSN we're rolling back to:
-     *    - if the record at the current LSN is undoable:
-     *       - Get a compensation log record (CLR) by calling undo on the record
-     *       - Emit the CLR
-     *       - Call redo on the CLR to perform the undo
-     *    - update the current LSN to that of the next record to undo
-     *
+     * - if the record at the current LSN is undoable:
+     * - Get a compensation log record (CLR) by calling undo on the record
+     * - Emit the CLR
+     * - Call redo on the CLR to perform the undo
+     * - update the current LSN to that of the next record to undo
+     * <p>
      * Note above that calling .undo() on a record does not perform the undo, it
      * just creates the compensation log record.
      *
      * @param transNum transaction to perform a rollback for
-     * @param LSN LSN to which we should rollback
+     * @param LSN      LSN to which we should rollback
      */
     private void rollbackToLSN(long transNum, long LSN) {
         TransactionTableEntry transactionEntry = transactionTable.get(transNum);
@@ -160,7 +161,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
     /**
      * Called before a page is flushed from the buffer cache. This
      * method is never called on a log page.
-     *
+     * <p>
      * The log should be as far as necessary.
      *
      * @param pageLSN pageLSN of page about to be flushed
@@ -172,7 +173,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * Called when a page has been updated on disk.
-     *
+     * <p>
      * As the page is no longer dirty, it should be removed from the
      * dirty page table.
      *
@@ -185,18 +186,18 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * Called when a write to a page happens.
-     *
+     * <p>
      * This method is never called on a log page. Arguments to the before and after params
      * are guaranteed to be the same length.
-     *
+     * <p>
      * The appropriate log record should be appended, and the transaction table
      * and dirty page table should be updated accordingly.
      *
-     * @param transNum transaction performing the write
-     * @param pageNum page number of page being written
+     * @param transNum   transaction performing the write
+     * @param pageNum    page number of page being written
      * @param pageOffset offset into page where write begins
-     * @param before bytes starting at pageOffset before the write
-     * @param after bytes starting at pageOffset after the write
+     * @param before     bytes starting at pageOffset before the write
+     * @param after      bytes starting at pageOffset after the write
      * @return LSN of last record written to log
      */
     @Override
@@ -211,14 +212,14 @@ public class ARIESRecoveryManager implements RecoveryManager {
     /**
      * Called when a new partition is allocated. A log flush is necessary,
      * since changes are visible on disk immediately after this returns.
-     *
+     * <p>
      * This method should return -1 if the partition is the log partition.
-     *
+     * <p>
      * The appropriate log record should be appended, and the log flushed.
      * The transaction table should be updated accordingly.
      *
      * @param transNum transaction requesting the allocation
-     * @param partNum partition number of the new partition
+     * @param partNum  partition number of the new partition
      * @return LSN of record or -1 if log partition
      */
     @Override
@@ -241,14 +242,14 @@ public class ARIESRecoveryManager implements RecoveryManager {
     /**
      * Called when a partition is freed. A log flush is necessary,
      * since changes are visible on disk immediately after this returns.
-     *
+     * <p>
      * This method should return -1 if the partition is the log partition.
-     *
+     * <p>
      * The appropriate log record should be appended, and the log flushed.
      * The transaction table should be updated accordingly.
      *
      * @param transNum transaction requesting the partition be freed
-     * @param partNum partition number of the partition being freed
+     * @param partNum  partition number of the partition being freed
      * @return LSN of record or -1 if log partition
      */
     @Override
@@ -272,14 +273,14 @@ public class ARIESRecoveryManager implements RecoveryManager {
     /**
      * Called when a new page is allocated. A log flush is necessary,
      * since changes are visible on disk immediately after this returns.
-     *
+     * <p>
      * This method should return -1 if the page is in the log partition.
-     *
+     * <p>
      * The appropriate log record should be appended, and the log flushed.
      * The transaction table should be updated accordingly.
      *
      * @param transNum transaction requesting the allocation
-     * @param pageNum page number of the new page
+     * @param pageNum  page number of the new page
      * @return LSN of record or -1 if log partition
      */
     @Override
@@ -303,14 +304,14 @@ public class ARIESRecoveryManager implements RecoveryManager {
     /**
      * Called when a page is freed. A log flush is necessary,
      * since changes are visible on disk immediately after this returns.
-     *
+     * <p>
      * This method should return -1 if the page is in the log partition.
-     *
+     * <p>
      * The appropriate log record should be appended, and the log flushed.
      * The transaction table should be updated accordingly.
      *
      * @param transNum transaction requesting the page be freed
-     * @param pageNum page number of the page being freed
+     * @param pageNum  page number of the page being freed
      * @return LSN of record or -1 if log partition
      */
     @Override
@@ -336,12 +337,12 @@ public class ARIESRecoveryManager implements RecoveryManager {
      * Creates a savepoint for a transaction. Creating a savepoint with
      * the same name as an existing savepoint for the transaction should
      * delete the old savepoint.
-     *
+     * <p>
      * The appropriate LSN should be recorded so that a partial rollback
      * is possible later.
      *
      * @param transNum transaction to make savepoint for
-     * @param name name of savepoint
+     * @param name     name of savepoint
      */
     @Override
     public void savepoint(long transNum, String name) {
@@ -352,8 +353,9 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * Releases (deletes) a savepoint for a transaction.
+     *
      * @param transNum transaction to delete savepoint for
-     * @param name name of savepoint
+     * @param name     name of savepoint
      */
     @Override
     public void releaseSavepoint(long transNum, String name) {
@@ -364,13 +366,13 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * Rolls back transaction to a savepoint.
-     *
+     * <p>
      * All changes done by the transaction since the savepoint should be undone,
      * in reverse order, with the appropriate CLRs written to log. The transaction
      * status should remain unchanged.
      *
      * @param transNum transaction to partially rollback
-     * @param name name of savepoint
+     * @param name     name of savepoint
      */
     @Override
     public void rollbackToSavepoint(long transNum, String name) {
@@ -386,15 +388,15 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * Create a checkpoint.
-     *
+     * <p>
      * First, a begin checkpoint record should be written.
-     *
+     * <p>
      * Then, end checkpoint records should be filled up as much as possible first
      * using recLSNs from the DPT, then status/lastLSNs from the transactions
      * table, and written when full (or when nothing is left to be written).
      * You may find the method EndCheckpointLogRecord#fitsInOneRecord here to
      * figure out when to write an end checkpoint record.
-     *
+     * <p>
      * Finally, the master record should be rewritten with the LSN of the
      * begin checkpoint record.
      */
@@ -437,7 +439,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
         dirtyPageTable.putIfAbsent(pageNum, LSN);
         // Handle race condition where earlier log is beaten to the insertion by
         // a later log.
-        dirtyPageTable.computeIfPresent(pageNum, (k, v) -> Math.min(LSN,v));
+        dirtyPageTable.computeIfPresent(pageNum, (k, v) -> Math.min(LSN, v));
     }
 
     @Override
@@ -452,7 +454,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
      * Called whenever the database starts up, and performs restart recovery.
      * Recovery is complete when the Runnable returned is run to termination.
      * New transactions may be started once this method returns.
-     *
+     * <p>
      * This should perform the three phases of recovery, and also clean the
      * dirty page table of non-dirty pages (pages that aren't dirty in the
      * buffer manager) between redo and undo, and perform a checkpoint after
@@ -470,38 +472,38 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * This method performs the analysis pass of restart recovery.
-     *
+     * <p>
      * First, the master record should be read (LSN 0). The master record contains
      * one piece of information: the LSN of the last successful checkpoint.
-     *
+     * <p>
      * We then begin scanning log records, starting at the beginning of the
      * last successful checkpoint.
-     *
+     * <p>
      * If the log record is for a transaction operation (getTransNum is present)
      * - update the transaction table
-     *
+     * <p>
      * If the log record is page-related, update the dpt
-     *   - update/undoupdate page will dirty pages
-     *   - free/undoalloc page always flush changes to disk
-     *   - no action needed for alloc/undofree page
-     *
+     * - update/undoupdate page will dirty pages
+     * - free/undoalloc page always flush changes to disk
+     * - no action needed for alloc/undofree page
+     * <p>
      * If the log record is for a change in transaction status:
      * - if END_TRANSACTION: clean up transaction (Transaction#cleanup), remove
-     *   from txn table, and add to endedTransactions
+     * from txn table, and add to endedTransactions
      * - update transaction status to COMMITTING/RECOVERY_ABORTING/COMPLETE
      * - update the transaction table
-     *
+     * <p>
      * If the log record is an end_checkpoint record:
      * - Copy all entries of checkpoint DPT (replace existing entries if any)
      * - Skip txn table entries for transactions that have already ended
      * - Add to transaction table if not already present
      * - Update lastLSN to be the larger of the existing entry's (if any) and
-     *   the checkpoint's
+     * the checkpoint's
      * - The status's in the transaction table should be updated if it is possible
-     *   to transition from the status in the table to the status in the
-     *   checkpoint. For example, running -> aborting is a possible transition,
-     *   but aborting -> running is not.
-     *
+     * to transition from the status in the table to the status in the
+     * checkpoint. For example, running -> aborting is a possible transition,
+     * but aborting -> running is not.
+     * <p>
      * After all records are processed, cleanup and end transactions that are in
      * the COMMITING state, and move all transactions in the RUNNING state to
      * RECOVERY_ABORTING/emit an abort record.
@@ -522,15 +524,15 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * This method performs the redo pass of restart recovery.
-     *
+     * <p>
      * First, determine the starting point for REDO from the dirty page table.
-     *
+     * <p>
      * Then, scanning from the starting point, if the record is redoable and
      * - about a partition (Alloc/Free/UndoAlloc/UndoFree..Part), always redo it
      * - allocates a page (AllocPage/UndoFreePage), always redo it
      * - modifies a page (Update/UndoUpdate/Free/UndoAlloc....Page) in
-     *   the dirty page table with LSN >= recLSN, the page is fetched from disk,
-     *   the pageLSN is checked, and the record is redone if needed.
+     * the dirty page table with LSN >= recLSN, the page is fetched from disk,
+     * the pageLSN is checked, and the record is redone if needed.
      */
     void restartRedo() {
         // TODO(proj5): implement
@@ -539,13 +541,13 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * This method performs the undo pass of restart recovery.
-
+     * <p>
      * First, a priority queue is created sorted on lastLSN of all aborting transactions.
-     *
+     * <p>
      * Then, always working on the largest LSN in the priority queue until we are done,
      * - if the record is undoable, undo it, and emit the appropriate CLR
      * - replace the entry in the set should be replaced with a new one, using the undoNextLSN
-     *   (or prevLSN if not available) of the record; and
+     * (or prevLSN if not available) of the record; and
      * - if the new LSN is 0, end the transaction and remove it from the queue and transaction table.
      */
     void restartUndo() {
@@ -572,6 +574,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
     }
 
     // Helpers /////////////////////////////////////////////////////////////////
+
     /**
      * Comparator for Pair<A, B> comparing only on the first element (type A),
      * in reverse order.

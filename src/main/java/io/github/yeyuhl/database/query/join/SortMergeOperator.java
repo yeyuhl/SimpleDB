@@ -8,6 +8,7 @@ import io.github.yeyuhl.database.query.QueryOperator;
 import io.github.yeyuhl.database.query.SortOperator;
 import io.github.yeyuhl.database.table.Record;
 
+
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -20,8 +21,8 @@ public class SortMergeOperator extends JoinOperator {
                              String rightColumnName,
                              TransactionContext transaction) {
         super(prepareLeft(transaction, leftSource, leftColumnName),
-              prepareRight(transaction, rightSource, rightColumnName),
-              leftColumnName, rightColumnName, transaction, JoinType.SORTMERGE);
+                prepareRight(transaction, rightSource, rightColumnName),
+                leftColumnName, rightColumnName, transaction, JoinType.SORTMERGE);
         this.stats = this.estimateStats();
     }
 
@@ -75,27 +76,24 @@ public class SortMergeOperator extends JoinOperator {
 
     /**
      * An implementation of Iterator that provides an iterator interface for this operator.
-     *    See lecture slides.
-     *
+     * See lecture slides.
+     * <p>
      * Before proceeding, you should read and understand SNLJOperator.java
-     *    You can find it in the same directory as this file.
-     *
+     * You can find it in the same directory as this file.
+     * <p>
      * Word of advice: try to decompose the problem into distinguishable sub-problems.
-     *    This means you'll probably want to add more methods than those given (Once again,
-     *    SNLJOperator.java might be a useful reference).
-     *
+     * This means you'll probably want to add more methods than those given (Once again,
+     * SNLJOperator.java might be a useful reference).
      */
     private class SortMergeIterator implements Iterator<Record> {
-        /**
-        * Some member variables are provided for guidance, but there are many possible solutions.
-        * You should implement the solution that's best for you, using any member variables you need.
-        * You're free to use these member variables, but you're not obligated to.
-        */
         private Iterator<Record> leftIterator;
         private BacktrackingIterator<Record> rightIterator;
         private Record leftRecord;
         private Record nextRecord;
         private Record rightRecord;
+        /**
+         * 用来标记S表的record，起回溯作用
+         */
         private boolean marked;
 
         private SortMergeIterator() {
@@ -135,12 +133,59 @@ public class SortMergeOperator extends JoinOperator {
         }
 
         /**
-         * Returns the next record that should be yielded from this join,
-         * or null if there are no more records to join.
+         * 返回应从此连接生成的下一条record，如果没有则返回null
          */
         private Record fetchNextRecord() {
-            // TODO(proj3_part1): implement
-            return null;
+            if (leftRecord == null) {
+                return null;
+            }
+            Record result;
+            // 1阶段，如果没有标记，说明还没找到匹配的，在比大小
+            if (!this.marked) {
+                while (compare(leftRecord, rightRecord) < 0) {
+                    if (!leftIterator.hasNext()) {
+                        return null;
+                    }
+                    leftRecord = leftIterator.next();
+                }
+                while (compare(leftRecord, rightRecord) > 0) {
+                    if (!rightIterator.hasNext()) {
+                        return null;
+                    }
+                    rightRecord = rightIterator.next();
+                }
+                // mark实际上是对S表的record进行标记
+                rightIterator.markPrev();
+                this.marked = true;
+            }
+            // 2阶段，ri和sj匹配后返回，遍历sj后面的record，把所有和ri匹配的records都找到
+            if (compare(leftRecord, rightRecord) == 0) {
+                result = leftRecord.concat(rightRecord);
+                if (rightIterator.hasNext()) {
+                    rightRecord = rightIterator.next();
+                } else {
+                    rightIterator.reset();
+                    rightRecord = rightIterator.next();
+                    if (leftIterator.hasNext()) {
+                        leftRecord = leftIterator.next();
+                    } else {
+                        leftRecord = null;
+                    }
+                }
+                return result;
+            }
+            // 3阶段，没有匹配的，则对S回溯，R表读取下一条record，返回1阶段
+            else {
+                rightIterator.reset();
+                rightRecord = rightIterator.next();
+                if (leftIterator.hasNext()) {
+                    leftRecord = leftIterator.next();
+                } else {
+                    leftRecord = null;
+                }
+                this.marked = false;
+                return fetchNextRecord();
+            }
         }
 
         @Override

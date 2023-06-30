@@ -6,12 +6,15 @@ import io.github.yeyuhl.database.query.JoinOperator;
 import io.github.yeyuhl.database.query.QueryOperator;
 import io.github.yeyuhl.database.table.Record;
 
+
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
- * Performs an equijoin between two relations on leftColumnName and
- * rightColumnName respectively using the Block Nested Loop Join algorithm.
+ * 使用BNLJ(块嵌套循环连接)算法分别在 leftColumnName 和 rightColumnName 上的两个关系之间执行等值连接
+ *
+ * @author yeyuhl
+ * @since 2023/6/28
  */
 public class BNLJOperator extends JoinOperator {
     protected int numBuffers;
@@ -21,9 +24,7 @@ public class BNLJOperator extends JoinOperator {
                         String leftColumnName,
                         String rightColumnName,
                         TransactionContext transaction) {
-        super(leftSource, materialize(rightSource, transaction),
-                leftColumnName, rightColumnName, transaction, JoinType.BNLJ
-        );
+        super(leftSource, materialize(rightSource, transaction), leftColumnName, rightColumnName, transaction, JoinType.BNLJ);
         this.numBuffers = transaction.getWorkMemSize();
         this.stats = this.estimateStats();
     }
@@ -33,22 +34,22 @@ public class BNLJOperator extends JoinOperator {
         return new BNLJIterator();
     }
 
+    /**
+     * 估算块嵌套循环连接的IO成本
+     */
     @Override
     public int estimateIOCost() {
-        //This method implements the IO cost estimation of the Block Nested Loop Join
         int usableBuffers = numBuffers - 2;
         int numLeftPages = getLeftSource().estimateStats().getNumPages();
         int numRightPages = getRightSource().estimateIOCost();
         return ((int) Math.ceil((double) numLeftPages / (double) usableBuffers)) * numRightPages +
-               getLeftSource().estimateIOCost();
+                getLeftSource().estimateIOCost();
     }
 
     /**
-     * A record iterator that executes the logic for a simple nested loop join.
-     * Look over the implementation in SNLJOperator if you want to get a feel
-     * for the fetchNextRecord() logic.
+     * 执行简单嵌套循环连接逻辑的record迭代器
      */
-    private class BNLJIterator implements Iterator<Record>{
+    private class BNLJIterator implements Iterator<Record> {
         // Iterator over all the records of the left source
         private Iterator<Record> leftSourceIterator;
         // Iterator over all the records of the right source
@@ -75,45 +76,75 @@ public class BNLJOperator extends JoinOperator {
         }
 
         /**
-         * Fetch the next block of records from the left source.
-         * leftBlockIterator should be set to a backtracking iterator over up to
-         * B-2 pages of records from the left source, and leftRecord should be
-         * set to the first record in this block.
-         *
-         * If there are no more records in the left source, this method should
-         * do nothing.
-         *
-         * You may find QueryOperator#getBlockIterator useful here.
+         * 从左侧源获取下一个records块，leftBlockIterator应设置为回溯迭代器
+         * 该迭代器最多包含来自左侧源的B-2页records，并且leftRecord应设置为此块中的第一条record
+         * <p>
+         * 如果左侧源中没有更多的records，则此方法应不执行任何操作
          */
         private void fetchNextLeftBlock() {
-            // TODO(proj3_part1): implement
+            // 没有更多的records，返回
+            if (!leftSourceIterator.hasNext()) {
+                return;
+            }
+            leftBlockIterator = QueryOperator.getBlockIterator(leftSourceIterator, getLeftSource().getSchema(), numBuffers - 2);
+            leftBlockIterator.markNext();
+            // 设置leftRecord为此块中的第一条record
+            leftRecord = leftBlockIterator.next();
         }
 
         /**
-         * Fetch the next page of records from the right source.
-         * rightPageIterator should be set to a backtracking iterator over up to
-         * one page of records from the right source.
-         *
-         * If there are no more records in the right source, this method should
-         * do nothing.
-         *
-         * You may find QueryOperator#getBlockIterator useful here.
+         * 从正确的来源获取下一页records，rightPage迭代器应设置为回溯迭代器，最多包含来自正确源的一页records
+         * <p>
+         * 如果右侧源中没有更多的records，则此方法应不执行任何操作
          */
         private void fetchNextRightPage() {
-            // TODO(proj3_part1): implement
+            if (!rightSourceIterator.hasNext()) {
+                return;
+            }
+            rightPageIterator = QueryOperator.getBlockIterator(rightSourceIterator, getRightSource().getSchema(), 1);
+            rightPageIterator.markNext();
         }
 
         /**
-         * Returns the next record that should be yielded from this join,
-         * or null if there are no more records to join.
-         *
-         * You may find JoinOperator#compare useful here. (You can call compare
-         * function directly from this file, since BNLJOperator is a subclass
-         * of JoinOperator).
+         * 返回应从此连接生成的下一条record(两个record连接形成的新record)，如果没有则返回null
          */
         private Record fetchNextRecord() {
-            // TODO(proj3_part1): implement
-            return null;
+            Record rightRecord;
+            while (true) {
+                if (rightPageIterator.hasNext()) {
+                }
+                // 右侧page中的records都匹配过了，没有和leftRecord匹配上的，获取这个块中的下一条leftRecord
+                // 注意要重置rightPageIterator，因为leftRecord变了，所以要重新匹配
+                else if (leftBlockIterator.hasNext()) {
+                    leftRecord = leftBlockIterator.next();
+                    rightPageIterator.reset();
+                }
+                // 右侧page中的records都匹配过了，左侧块中的records没有一个匹配上的，获取下一个rightPage
+                // 注意要重置leftBlockIterator，因为rightPage变了，所以要重新匹配
+                else if (rightSourceIterator.hasNext()) {
+                    leftBlockIterator.reset();
+                    leftRecord = leftBlockIterator.next();
+                    fetchNextRightPage();
+                }
+                // 所有右侧源中的records都匹配过了，左侧块中的records没有一个匹配上的，获取下一个leftBlock
+                // 主要要重置rightSourceIterator，因为leftBlock变了，所以要重新匹配
+                else if (leftSourceIterator.hasNext()) {
+                    fetchNextLeftBlock();
+                    rightSourceIterator.reset();
+                    fetchNextRightPage();
+
+                }
+                // 全部匹配过了，还是匹配不上，返回null
+                else {
+                    return null;
+                }
+                // 从右侧page中获取下一个record
+                rightRecord = rightPageIterator.next();
+                // 如果左侧record和右侧record相等，则返回该连接形成的新record
+                if (compare(leftRecord, rightRecord) == 0) {
+                    return leftRecord.concat(rightRecord);
+                }
+            }
         }
 
         /**

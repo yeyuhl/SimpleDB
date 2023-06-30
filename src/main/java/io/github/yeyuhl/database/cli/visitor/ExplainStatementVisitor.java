@@ -4,7 +4,10 @@ import io.github.yeyuhl.database.Transaction;
 import io.github.yeyuhl.database.cli.parser.ASTSelectStatement;
 import io.github.yeyuhl.database.query.QueryPlan;
 
-public class ExplainStatementVisitor extends StatementVisitor {
+
+import java.io.PrintStream;
+
+class ExplainStatementVisitor extends StatementVisitor {
     StatementVisitor visitor;
 
     @Override
@@ -15,10 +18,10 @@ public class ExplainStatementVisitor extends StatementVisitor {
     }
 
     @Override
-    public void execute(Transaction transaction) {
+    public void execute(Transaction transaction, PrintStream out) {
         QueryPlan query = this.visitor.getQueryPlan(transaction).get();
         query.execute();
-        System.out.println(query.getFinalOperator());
+        out.println(query.getFinalOperator());
     }
 
     @Override

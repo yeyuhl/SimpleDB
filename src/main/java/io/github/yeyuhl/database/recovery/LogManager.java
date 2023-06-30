@@ -27,7 +27,7 @@ import java.util.*;
  * master record, which only contains a few log entries: the master record, with LSN 0, followed
  * by an empty begin and end checkpoint record. The master record is the only record in the
  * entire log that may be rewritten.
- *
+ * <p>
  * The LogManager is also responsible for writing pageLSNs onto pages and flushing the log
  * when pages are flushed, and therefore has a few methods that must be called by the buffer
  * manager when pages are fetched and evicted (fetchPageHook, fetchNewPageHook, and pageEvictHook).
@@ -58,6 +58,7 @@ public class LogManager implements Iterable<LogRecord>, AutoCloseable {
 
     /**
      * Writes to the first record in the log.
+     *
      * @param record log record to replace first record with
      */
     public synchronized void rewriteMasterRecord(MasterLogRecord record) {
@@ -72,6 +73,7 @@ public class LogManager implements Iterable<LogRecord>, AutoCloseable {
 
     /**
      * Appends a log record to the log.
+     *
      * @param record log record to append to the log
      * @return LSN of new log record
      */
@@ -106,6 +108,7 @@ public class LogManager implements Iterable<LogRecord>, AutoCloseable {
 
     /**
      * Fetches a specific log record.
+     *
      * @param LSN LSN of record to fetch
      * @return log record with the specified LSN
      */
@@ -130,6 +133,7 @@ public class LogManager implements Iterable<LogRecord>, AutoCloseable {
      * Flushes the log to at least the specified record,
      * essentially flushing up to and including the page
      * that contains the record specified by the LSN.
+     *
      * @param LSN LSN up to which the log should be flushed
      */
     public synchronized void flushToLSN(long LSN) {
@@ -161,8 +165,9 @@ public class LogManager implements Iterable<LogRecord>, AutoCloseable {
 
     /**
      * Generates LSN from log page number and index
+     *
      * @param pageNum page number of log page
-     * @param index index of the log record within the log page
+     * @param index   index of the log record within the log page
      * @return LSN
      */
     static long makeLSN(long pageNum, int index) {
@@ -171,6 +176,7 @@ public class LogManager implements Iterable<LogRecord>, AutoCloseable {
 
     /**
      * Generates the max possible LSN on the given page
+     *
      * @param pageNum page number of log page
      * @return max possible LSN on the log page
      */
@@ -180,6 +186,7 @@ public class LogManager implements Iterable<LogRecord>, AutoCloseable {
 
     /**
      * Get the page number of the page with the record corresponding to LSN
+     *
      * @param LSN LSN to get page of
      * @return page that LSN resides on
      */
@@ -189,6 +196,7 @@ public class LogManager implements Iterable<LogRecord>, AutoCloseable {
 
     /**
      * Get the index within the page of the record corresponding to LSN
+     *
      * @param LSN LSN to get index of
      * @return index in page that LSN resides on
      */
@@ -198,6 +206,7 @@ public class LogManager implements Iterable<LogRecord>, AutoCloseable {
 
     /**
      * Scan forward in the log from LSN.
+     *
      * @param LSN LSN to start scanning from
      * @return iterator over log entries from LSN
      */
@@ -207,6 +216,7 @@ public class LogManager implements Iterable<LogRecord>, AutoCloseable {
 
     /**
      * Scan forward in the log from the first record.
+     *
      * @return iterator over all log entries
      */
     @Override

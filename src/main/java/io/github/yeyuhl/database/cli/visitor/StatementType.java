@@ -1,6 +1,6 @@
 package io.github.yeyuhl.database.cli.visitor;
 
-public enum StatementType{
+enum StatementType{
     CREATE_TABLE,
     CREATE_INDEX,
     DROP_TABLE,

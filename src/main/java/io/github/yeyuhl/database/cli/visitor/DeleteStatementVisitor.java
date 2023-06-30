@@ -3,12 +3,16 @@ package io.github.yeyuhl.database.cli.visitor;
 import io.github.yeyuhl.database.Transaction;
 import io.github.yeyuhl.database.cli.parser.ASTExpression;
 import io.github.yeyuhl.database.cli.parser.ASTIdentifier;
-import io.github.yeyuhl.database.query.aggr.DataFunction;
+import io.github.yeyuhl.database.query.expr.Expression;
+import io.github.yeyuhl.database.query.expr.ExpressionVisitor;
 import io.github.yeyuhl.database.table.Schema;
 
-public class DeleteStatementVisitor extends StatementVisitor {
+
+import java.io.PrintStream;
+
+class DeleteStatementVisitor extends StatementVisitor {
     public String tableName;
-    public DataFunction cond;
+    public Expression cond;
 
     @Override
     public void visit(ASTIdentifier node, Object data) {
@@ -23,15 +27,15 @@ public class DeleteStatementVisitor extends StatementVisitor {
     }
 
     @Override
-    public void execute(Transaction transaction) {
+    public void execute(Transaction transaction, PrintStream out) {
         try {
             Schema schema = transaction.getSchema(tableName);
             this.cond.setSchema(schema);
             transaction.delete(tableName, cond::evaluate);
-            System.out.println("DELETE");
+            out.println("DELETE");
         } catch (Exception e) {
-            System.out.println(e.getMessage());
-            System.out.println("Failed to execute DELETE.");
+            out.println(e.getMessage());
+            out.println("Failed to execute DELETE.");
         }
     }
 

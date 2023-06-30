@@ -38,15 +38,19 @@ public interface RookieParserVisitor
   public void visit(ASTIntegerLiteral node, Object data);
   public void visit(ASTLiteral node, Object data);
   public void visit(ASTComparisonOperator node, Object data);
-  public void visit(ASTLogicalOperator node, Object data);
+  public void visit(ASTOrOperator node, Object data);
+  public void visit(ASTAndOperator node, Object data);
+  public void visit(ASTNotOperator node, Object data);
   public void visit(ASTMultiplicativeOperator node, Object data);
   public void visit(ASTAdditiveOperator node, Object data);
   public void visit(ASTExpression node, Object data);
-  public void visit(ASTLogicalExpression node, Object data);
+  public void visit(ASTOrExpression node, Object data);
+  public void visit(ASTAndExpression node, Object data);
+  public void visit(ASTNotExpression node, Object data);
   public void visit(ASTComparisonExpression node, Object data);
   public void visit(ASTAdditiveExpression node, Object data);
   public void visit(ASTMultiplicativeExpression node, Object data);
   public void visit(ASTFunctionCallExpression node, Object data);
   public void visit(ASTPrimaryExpression node, Object data);
 }
-/* JavaCC - OriginalChecksum=4578cc734cd4e3691924ea21bd64fca2 (do not edit this line) */
+/* JavaCC - OriginalChecksum=b2a80acec93a79482d81c9c81b82256e (do not edit this line) */

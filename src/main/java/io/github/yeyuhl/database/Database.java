@@ -21,12 +21,13 @@ import io.github.yeyuhl.database.memory.EvictionPolicy;
 import io.github.yeyuhl.database.query.QueryPlan;
 import io.github.yeyuhl.database.query.SequentialScanOperator;
 import io.github.yeyuhl.database.query.SortOperator;
-import io.github.yeyuhl.database.query.aggr.DataFunction;
+import io.github.yeyuhl.database.query.expr.Expression;
 import io.github.yeyuhl.database.recovery.ARIESRecoveryManager;
 import io.github.yeyuhl.database.recovery.DummyRecoveryManager;
 import io.github.yeyuhl.database.recovery.RecoveryManager;
 import io.github.yeyuhl.database.table.*;
 import io.github.yeyuhl.database.table.stats.TableStats;
+
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -107,6 +108,9 @@ public class Database implements AutoCloseable {
     // Statistics about the contents of the database.
     private Map<String, TableStats> stats = new ConcurrentHashMap<>();
 
+    // Names of tables loaded for demo
+    private ArrayList<String> demoTables = new ArrayList<>();
+
     /**
      * Creates a new database with:
      * - Default buffer size
@@ -184,7 +188,7 @@ public class Database implements AutoCloseable {
 
         diskSpaceManager = new DiskSpaceManagerImpl(fileDir, recoveryManager);
         bufferManager = new BufferManager(diskSpaceManager, recoveryManager, numMemoryPages,
-                                              policy);
+                policy);
 
         // create log partition
         if (!initialized) diskSpaceManager.allocPart(0);
@@ -195,7 +199,6 @@ public class Database implements AutoCloseable {
         recoveryManager.restart();
 
         Transaction initTransaction = beginTransaction();
-        TransactionContext.setTransaction(initTransaction.getTransactionContext());
 
         if (!initialized) {
             // _metadata.tables partition, and _metadata.indices partition
@@ -209,7 +212,6 @@ public class Database implements AutoCloseable {
             this.loadMetadataTables();
         }
         initTransaction.commit();
-        TransactionContext.unsetTransaction();
     }
 
     private boolean setupDirectory(String fileDir) {
@@ -239,7 +241,7 @@ public class Database implements AutoCloseable {
         PageDirectory tableInfoPageDir = new PageDirectory(bufferManager, 1, tableInfoPage0, (short) 0,
                 tableInfoContext);
         tableMetadata = new Table(TABLE_INFO_TABLE_NAME, getTableInfoSchema(), tableInfoPageDir,
-                              tableInfoContext, stats);
+                tableInfoContext, stats);
     }
 
     // create _metadata.indices
@@ -248,7 +250,7 @@ public class Database implements AutoCloseable {
         diskSpaceManager.allocPage(indexInfoPage0);
         LockContext indexInfoContext =  new DummyLockContext("_dummyIndexInfo");
         PageDirectory pageDirectory = new PageDirectory(bufferManager, 2, indexInfoPage0, (short) 0,
-                                              indexInfoContext);
+                indexInfoContext);
         indexMetadata = new Table(INDEX_INFO_TABLE_NAME, getIndexInfoSchema(), pageDirectory, indexInfoContext, stats);
     }
 
@@ -268,7 +270,7 @@ public class Database implements AutoCloseable {
         PageDirectory indexInfoPageDir = new PageDirectory(bufferManager, 2,
                 DiskSpaceManager.getVirtualPageNum(2, 0), (short) 0, indexInfoContext);
         indexMetadata = new Table(INDEX_INFO_TABLE_NAME, getIndexInfoSchema(), indexInfoPageDir,
-                              indexInfoContext, stats);
+                indexInfoContext, stats);
         indexMetadata.setFullPageRecords();
     }
 
@@ -286,6 +288,8 @@ public class Database implements AutoCloseable {
     public synchronized void close() {
         // wait for all transactions to terminate
         this.waitAllTransactions();
+
+        dropDemoTables();
 
         this.bufferManager.evictAll();
 
@@ -574,9 +578,9 @@ public class Database implements AutoCloseable {
         if (activeTransactions.isTerminated()) {
             activeTransactions = new Phaser(1);
         }
-
         this.recoveryManager.startTransaction(t);
         ++this.numTransactions;
+        TransactionContext.setTransaction(t.getTransactionContext());
         return t;
     }
 
@@ -603,12 +607,14 @@ public class Database implements AutoCloseable {
         Map<String, String> aliases;
         Map<String, Table> tempTables;
         long tempTableCounter;
+        boolean recoveryTransaction;
 
-        private TransactionContextImpl(long tNum) {
+        private TransactionContextImpl(long tNum, boolean recoveryTransaction) {
             this.transNum = tNum;
             this.aliases = new HashMap<>();
             this.tempTables = new HashMap<>();
             this.tempTableCounter = 0;
+            this.recoveryTransaction = recoveryTransaction;
         }
 
         @Override
@@ -698,7 +704,7 @@ public class Database implements AutoCloseable {
             } else {
                 try {
                     return new SortOperator(this, new SequentialScanOperator(this, tableName),
-                        columnName).iterator();
+                            columnName).iterator();
                 } catch (Exception e2) {
                     throw new DatabaseException(e2);
                 }
@@ -836,7 +842,7 @@ public class Database implements AutoCloseable {
                 Record cur = getRecord(tableName, curRID);
                 List<DataBox> recordCopy = cur.getValues();
                 DataBox cond = condition.apply(cur);
-                if (!DataFunction.toBool(cond)) continue;
+                if (!Expression.toBool(cond)) continue;
                 recordCopy.set(uindex, targetValue.apply(cur));
                 updateRecord(tableName, curRID, new Record(recordCopy));
             }
@@ -873,7 +879,7 @@ public class Database implements AutoCloseable {
                 RecordId curRID = recordIds.next();
                 Record cur = getRecord(tableName, curRID);
                 DataBox cond = condition.apply(cur);
-                if (!DataFunction.toBool(cond)) continue;
+                if (!Expression.toBool(cond)) continue;
                 deleteRecord(tableName, curRID);
             }
         }
@@ -889,8 +895,8 @@ public class Database implements AutoCloseable {
             Schema qualified = new Schema();
             for (int i = 0; i < schema.size(); i++) {
                 qualified.add(
-                    tableName + "." + schema.getFieldName(i),
-                    schema.getFieldType(i)
+                        tableName + "." + schema.getFieldName(i),
+                        schema.getFieldType(i)
                 );
             }
             return qualified;
@@ -934,6 +940,8 @@ public class Database implements AutoCloseable {
                 // https://stackoverflow.com/questions/7849416/what-is-a-suppressed-exception
                 e.printStackTrace();
                 throw e;
+            } finally {
+                if (!this.recoveryTransaction) TransactionContext.unsetTransaction();
             }
         }
 
@@ -976,7 +984,7 @@ public class Database implements AutoCloseable {
         private TransactionImpl(long transNum, boolean recovery) {
             this.transNum = transNum;
             this.recoveryTransaction = recovery;
-            this.transactionContext = new TransactionContextImpl(transNum);
+            this.transactionContext = new TransactionContextImpl(transNum, recovery);
         }
 
         @Override
@@ -990,18 +998,13 @@ public class Database implements AutoCloseable {
             }
             ExecutableStatementVisitor visitor = new ExecutableStatementVisitor();
             stmt.jjtAccept(visitor, null);
-            Optional<QueryPlan> qp = visitor.execute(this);
+            Optional<QueryPlan> qp = visitor.execute(this, System.out);
             return qp;
         }
 
         @Override
         protected void startCommit() {
-            TransactionContext.setTransaction(this.transactionContext);
-            try {
-                transactionContext.deleteAllTempTables();
-            } finally {
-                TransactionContext.unsetTransaction();
-            }
+            transactionContext.deleteAllTempTables();
             recoveryManager.commit(transNum);
             this.cleanup();
         }
@@ -1036,26 +1039,21 @@ public class Database implements AutoCloseable {
             if (tableName.contains(".") || tableName.contains(" ") || tableName.length() == 0) {
                 throw new IllegalArgumentException("name of new table may not contain '.' or ' ', or be the empty string");
             }
-            TransactionContext.setTransaction(transactionContext);
-            try {
-                // To create the table we'll need exclusive access to it's metadata for the duration of the transaction
-                // This way, other transactions won't be able to access it in the event that we abort
-                LockUtil.ensureSufficientLockHeld(getTableMetadataContext(tableName), LockType.X);
+            // To create the table we'll need exclusive access to it's metadata for the duration of the transaction
+            // This way, other transactions won't be able to access it in the event that we abort
+            LockUtil.ensureSufficientLockHeld(getTableMetadataContext(tableName), LockType.X);
 
-                // To check whether the table exists we just need to read that table's metadata, if it exists
-                Pair<RecordId, TableMetadata> pair = getTableMetadata(tableName);
-                if (pair != null) {
-                    throw new DatabaseException("table `" + tableName + "` already exists");
-                }
-                TableMetadata metadata = new TableMetadata(tableName);
-                metadata.partNum = diskSpaceManager.allocPart();
-                metadata.pageNum = diskSpaceManager.allocPage(metadata.partNum);
-                metadata.schema = s;
-                synchronized (tableMetadata) {
-                    tableMetadata.addRecord(metadata.toRecord());
-                }
-            } finally {
-                TransactionContext.unsetTransaction();
+            // To check whether the table exists we just need to read that table's metadata, if it exists
+            Pair<RecordId, TableMetadata> pair = getTableMetadata(tableName);
+            if (pair != null) {
+                throw new DatabaseException("table `" + tableName + "` already exists");
+            }
+            TableMetadata metadata = new TableMetadata(tableName);
+            metadata.partNum = diskSpaceManager.allocPart();
+            metadata.pageNum = diskSpaceManager.allocPage(metadata.partNum);
+            metadata.schema = s;
+            synchronized (tableMetadata) {
+                tableMetadata.addRecord(metadata.toRecord());
             }
         }
 
@@ -1064,44 +1062,34 @@ public class Database implements AutoCloseable {
             if (tableName.contains(".") || tableName.contains(" ") || tableName.length() == 0) {
                 throw new IllegalArgumentException("name of new table may not contain '.' or ' ', or be the empty string");
             }
-            TransactionContext.setTransaction(transactionContext);
-            try {
-                // To check whether the table exists we just need to read that table's metadata, if it exists
-                Pair<RecordId, TableMetadata> pair = getTableMetadata(tableName);
-                if (pair == null) {
-                    throw new DatabaseException("table `" + tableName + "` doesn't exist!");
-                }
-                // To drop a table we'll need exclusive access to it's metadata and the metadata of its indices
-                LockUtil.ensureSufficientLockHeld(getTableMetadataContext(tableName), LockType.X);
-                LockUtil.ensureSufficientLockHeld(getTableIndexMetadataContext(tableName), LockType.X);
-
-                for (Pair<RecordId, BPlusTreeMetadata> p: getTableIndicesMetadata(tableName)) {
-                    BPlusTreeMetadata tree = p.getSecond();
-                    dropIndex(tableName, tree.getColName());
-                }
-                RecordId rid = getTableMetadata(tableName).getFirst();
-                TableMetadata metadata;
-                synchronized(tableMetadata) {
-                    metadata = new TableMetadata(tableMetadata.deleteRecord(rid));
-                }
-                bufferManager.freePart(metadata.partNum);
-            } finally {
-                TransactionContext.unsetTransaction();
+            // To check whether the table exists we just need to read that table's metadata, if it exists
+            Pair<RecordId, TableMetadata> pair = getTableMetadata(tableName);
+            if (pair == null) {
+                throw new DatabaseException("table `" + tableName + "` doesn't exist!");
             }
+            // To drop a table we'll need exclusive access to it's metadata and the metadata of its indices
+            LockUtil.ensureSufficientLockHeld(getTableMetadataContext(tableName), LockType.X);
+            LockUtil.ensureSufficientLockHeld(getTableIndexMetadataContext(tableName), LockType.X);
+
+            for (Pair<RecordId, BPlusTreeMetadata> p: getTableIndicesMetadata(tableName)) {
+                BPlusTreeMetadata tree = p.getSecond();
+                dropIndex(tableName, tree.getColName());
+            }
+            RecordId rid = getTableMetadata(tableName).getFirst();
+            TableMetadata metadata;
+            synchronized(tableMetadata) {
+                metadata = new TableMetadata(tableMetadata.deleteRecord(rid));
+            }
+            bufferManager.freePart(metadata.partNum);
         }
 
         @Override
         public void dropAllTables() {
-            TransactionContext.setTransaction(transactionContext);
-            try {
-                // For something as drastic as dropping all tables we'll want
-                // to get an exclusive lock on the entire database.
-                LockUtil.ensureSufficientLockHeld(lockManager.databaseContext(), LockType.X);
-                for (Pair<RecordId, TableMetadata> p: scanTableMetadata()) {
-                    dropTable(p.getSecond().tableName);
-                }
-            } finally {
-                TransactionContext.unsetTransaction();
+            // For something as drastic as dropping all tables we'll want
+            // to get an exclusive lock on the entire database.
+            LockUtil.ensureSufficientLockHeld(lockManager.databaseContext(), LockType.X);
+            for (Pair<RecordId, TableMetadata> p: scanTableMetadata()) {
+                dropTable(p.getSecond().tableName);
             }
         }
 
@@ -1110,74 +1098,64 @@ public class Database implements AutoCloseable {
             if (tableName.contains(".") || tableName.contains(" ") || tableName.length() == 0) {
                 throw new IllegalArgumentException("name of new table may not contain '.' or ' ', or be the empty string");
             }
-            TransactionContext.setTransaction(transactionContext);
-            try {
-                // We want to check that the table exists
-                TableMetadata tableMetadata = getTableMetadata(tableName).getSecond();
-                if (tableMetadata == null) {
-                    throw new DatabaseException("table " + tableName + " does not exist");
-                }
+            // We want to check that the table exists
+            TableMetadata tableMetadata = getTableMetadata(tableName).getSecond();
+            if (tableMetadata == null) {
+                throw new DatabaseException("table " + tableName + " does not exist");
+            }
 
-                Schema s = tableMetadata.schema;
-                List<String> schemaColNames = s.getFieldNames();
-                List<Type> schemaColType = s.getFieldTypes();
-                if (!schemaColNames.contains(columnName)) {
-                    throw new DatabaseException("table " + tableName + " does not have a column " + columnName);
-                }
+            Schema s = tableMetadata.schema;
+            List<String> schemaColNames = s.getFieldNames();
+            List<Type> schemaColType = s.getFieldTypes();
+            if (!schemaColNames.contains(columnName)) {
+                throw new DatabaseException("table " + tableName + " does not have a column " + columnName);
+            }
 
-                int columnIndex = schemaColNames.indexOf(columnName);
-                Type colType = schemaColType.get(columnIndex);
+            int columnIndex = schemaColNames.indexOf(columnName);
+            Type colType = schemaColType.get(columnIndex);
 
-                // To create the index we'll need an exclusive lock on its metadata
-                LockUtil.ensureSufficientLockHeld(getColumnIndexMetadataContext(tableName, columnName), LockType.X);
-                Pair<RecordId, BPlusTreeMetadata> pair = getColumnIndexMetadata(tableName, columnName);
-                if (pair != null) {
-                    throw new DatabaseException("index already exists on " + tableName + "(" + columnName + ")");
-                }
+            // To create the index we'll need an exclusive lock on its metadata
+            LockUtil.ensureSufficientLockHeld(getColumnIndexMetadataContext(tableName, columnName), LockType.X);
+            Pair<RecordId, BPlusTreeMetadata> pair = getColumnIndexMetadata(tableName, columnName);
+            if (pair != null) {
+                throw new DatabaseException("index already exists on " + tableName + "(" + columnName + ")");
+            }
 
-                int order = BPlusTree.maxOrder(BufferManager.EFFECTIVE_PAGE_SIZE, colType);
-                Record indexEntry = new Record(tableName, columnName, order,
-                        diskSpaceManager.allocPart(),
-                        diskSpaceManager.INVALID_PAGE_NUM,
-                        colType.getTypeId().ordinal(),
-                        colType.getSizeInBytes(), -1
-                );
-                synchronized (indexMetadata) {
-                    indexMetadata.addRecord(indexEntry);
-                }
-                BPlusTreeMetadata metadata = new BPlusTreeMetadata(indexEntry);
-                BPlusTree tree = indexFromMetadata(metadata);
+            int order = BPlusTree.maxOrder(BufferManager.EFFECTIVE_PAGE_SIZE, colType);
+            Record indexEntry = new Record(tableName, columnName, order,
+                    diskSpaceManager.allocPart(),
+                    diskSpaceManager.INVALID_PAGE_NUM,
+                    colType.getTypeId().ordinal(),
+                    colType.getSizeInBytes(), -1
+            );
+            synchronized (indexMetadata) {
+                indexMetadata.addRecord(indexEntry);
+            }
+            BPlusTreeMetadata metadata = new BPlusTreeMetadata(indexEntry);
+            BPlusTree tree = indexFromMetadata(metadata);
 
-                // load data into index
-                if (bulkLoad) {
-                    throw new UnsupportedOperationException("not implemented");
-                } else {
-                    Table table = tableFromMetadata(tableMetadata);
-                    for (RecordId rid : (Iterable<RecordId>) table::ridIterator) {
-                        Record record = table.getRecord(rid);
-                        tree.put(record.getValue(columnIndex), rid);
-                    }
+            // load data into index
+            if (bulkLoad) {
+                throw new UnsupportedOperationException("not implemented");
+            } else {
+                Table table = tableFromMetadata(tableMetadata);
+                for (RecordId rid : (Iterable<RecordId>) table::ridIterator) {
+                    Record record = table.getRecord(rid);
+                    tree.put(record.getValue(columnIndex), rid);
                 }
-            } finally {
-                TransactionContext.unsetTransaction();
             }
         }
 
         @Override
         public void dropIndex(String tableName, String columnName) {
-            TransactionContext.setTransaction(transactionContext);
-            try {
-                // We need exclusive write access on an index to drop it.
-                LockUtil.ensureSufficientLockHeld(getColumnIndexMetadataContext(tableName, columnName), LockType.X);
-                Pair<RecordId, BPlusTreeMetadata> pair = getColumnIndexMetadata(tableName, columnName);
-                if (pair == null) {
-                    throw new DatabaseException("no index on " + tableName + "(" + columnName + ")");
-                }
-                indexMetadata.deleteRecord(pair.getFirst());
-                bufferManager.freePart(pair.getSecond().getPartNum());
-            } finally {
-                TransactionContext.unsetTransaction();
+            // We need exclusive write access on an index to drop it.
+            LockUtil.ensureSufficientLockHeld(getColumnIndexMetadataContext(tableName, columnName), LockType.X);
+            Pair<RecordId, BPlusTreeMetadata> pair = getColumnIndexMetadata(tableName, columnName);
+            if (pair == null) {
+                throw new DatabaseException("no index on " + tableName + "(" + columnName + ")");
             }
+            indexMetadata.deleteRecord(pair.getFirst());
+            bufferManager.freePart(pair.getSecond().getPartNum());
         }
 
         @Override
@@ -1192,12 +1170,7 @@ public class Database implements AutoCloseable {
 
         @Override
         public void insert(String tableName, Record values) {
-            TransactionContext.setTransaction(transactionContext);
-            try {
-                transactionContext.addRecord(tableName, values);
-            } finally {
-                TransactionContext.unsetTransaction();
-            }
+            transactionContext.addRecord(tableName, values);
         }
 
         @Override
@@ -1208,74 +1181,39 @@ public class Database implements AutoCloseable {
         @Override
         public void update(String tableName, String targetColumnName, UnaryOperator<DataBox> targetValue,
                            String predColumnName, PredicateOperator predOperator, DataBox predValue) {
-            TransactionContext.setTransaction(transactionContext);
-            try {
-                transactionContext.updateRecordWhere(tableName, targetColumnName, targetValue, predColumnName,
-                                                        predOperator, predValue);
-            } finally {
-                TransactionContext.unsetTransaction();
-            }
+            transactionContext.updateRecordWhere(tableName, targetColumnName, targetValue, predColumnName,
+                    predOperator, predValue);
         }
 
         @Override
         public void update(String tableName, String targetColumnName, Function<Record, DataBox> expr, Function<Record, DataBox> cond) {
-            TransactionContext.setTransaction(transactionContext);
-            try {
-                transactionContext.updateRecordWhere(tableName, targetColumnName, expr, cond);
-            } finally {
-                TransactionContext.unsetTransaction();
-            }
+            transactionContext.updateRecordWhere(tableName, targetColumnName, expr, cond);
         }
 
         @Override
         public void delete(String tableName, String predColumnName, PredicateOperator predOperator,
                            DataBox predValue) {
-            TransactionContext.setTransaction(transactionContext);
-            try {
-                transactionContext.deleteRecordWhere(tableName, predColumnName, predOperator, predValue);
-            } finally {
-                TransactionContext.unsetTransaction();
-            }
+            transactionContext.deleteRecordWhere(tableName, predColumnName, predOperator, predValue);
         }
 
         @Override
         public void delete(String tableName, Function<Record, DataBox> cond) {
-            TransactionContext.setTransaction(transactionContext);
-            try {
-                transactionContext.deleteRecordWhere(tableName, cond);
-            } finally {
-                TransactionContext.unsetTransaction();
-            }
+            transactionContext.deleteRecordWhere(tableName, cond);
         }
 
         @Override
         public void savepoint(String savepointName) {
-            TransactionContext.setTransaction(transactionContext);
-            try {
-                recoveryManager.savepoint(transNum, savepointName);
-            } finally {
-                TransactionContext.unsetTransaction();
-            }
+            recoveryManager.savepoint(transNum, savepointName);
         }
 
         @Override
         public void rollbackToSavepoint(String savepointName) {
-            TransactionContext.setTransaction(transactionContext);
-            try {
-                recoveryManager.rollbackToSavepoint(transNum, savepointName);
-            } finally {
-                TransactionContext.unsetTransaction();
-            }
+            recoveryManager.rollbackToSavepoint(transNum, savepointName);
         }
 
         @Override
         public void releaseSavepoint(String savepointName) {
-            TransactionContext.setTransaction(transactionContext);
-            try {
-                recoveryManager.releaseSavepoint(transNum, savepointName);
-            } finally {
-                TransactionContext.unsetTransaction();
-            }
+            recoveryManager.releaseSavepoint(transNum, savepointName);
         }
 
         @Override
@@ -1294,10 +1232,25 @@ public class Database implements AutoCloseable {
         }
     }
 
+    public void dropDemoTables() {
+        for (String table: demoTables) {
+            try(Transaction t = beginTransaction()) {
+                t.dropTable(table);
+            } catch (DatabaseException e) {
+                // If table doesn't exist, continue
+            }
+        }
+    }
+
     public void loadDemo() throws IOException {
-        loadCSV("Students");
-        loadCSV("Courses");
-        loadCSV("Enrollments");
+        demoTables = new ArrayList<>(Arrays.asList("Students", "Courses", "Enrollments"));
+
+        dropDemoTables();
+
+        for (String table: demoTables) {
+            loadCSV(table);
+        }
+
         waitAllTransactions();
         getBufferManager().evictAll();
     }
@@ -1308,42 +1261,54 @@ public class Database implements AutoCloseable {
      * @return true if the table already existed in the database, false otherwise
      */
     public boolean loadCSV(String name) throws IOException {
-            InputStream is = Database.class.getClassLoader().getResourceAsStream(name + ".csv");
-            InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8);
-            BufferedReader buffered = new BufferedReader(reader);
-            String[] header = buffered.readLine().split(",");
-            Schema schema = new Schema();
-            for (int i = 0; i < header.length; i++) {
-                String[] parts = header[i].split(" ", 2);
-                // Must have at least one space separating field and type
-                assert parts.length == 2;
-                String fieldName = parts[0];
-                Type fieldType = Type.fromString(parts[1]);
-                schema.add(fieldName, fieldType);
+        InputStream is = Database.class.getClassLoader().getResourceAsStream(name + ".csv");
+        InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8);
+        BufferedReader buffered = new BufferedReader(reader);
+        String[] header = buffered.readLine().split(",");
+        Schema schema = new Schema();
+        for (int i = 0; i < header.length; i++) {
+            String[] parts = header[i].split(" ", 2);
+            // Must have at least one space separating field and type
+            assert parts.length == 2;
+            String fieldName = parts[0];
+            Type fieldType = Type.fromString(parts[1]);
+            schema.add(fieldName, fieldType);
+        }
+        List<Record> rows = new ArrayList<>();
+        String row = buffered.readLine();
+        while (row != null) {
+            String[] values = row.split(",");
+            List<DataBox> parsed = new ArrayList<>();
+            assert values.length == schema.size();
+            for (int i = 0; i < values.length; i++) {
+                parsed.add(DataBox.fromString(schema.getFieldType(i), values[i]));
             }
-            List<Record> rows = new ArrayList<>();
-            String row = buffered.readLine();
-            while (row != null) {
-                String[] values = row.split(",");
-                List<DataBox> parsed = new ArrayList<>();
-                assert values.length == schema.size();
-                for (int i = 0; i < values.length; i++) {
-                    parsed.add(DataBox.fromString(schema.getFieldType(i), values[i]));
-                }
-                rows.add(new Record(parsed));
-                row = buffered.readLine();
+            rows.add(new Record(parsed));
+            row = buffered.readLine();
+        }
+
+        try(Transaction t = beginTransaction()) {
+            t.createTable(schema, name);
+        } catch (DatabaseException e) {
+            if (e.getMessage().contains("already exists")) return true;
+            throw e;
+        }
+
+        // store table stats before inserting rows
+        Pair<RecordId, TableMetadata> pair = this.getTableMetadata(name);
+        if (pair == null) {
+            throw new DatabaseException("Table `" + name + "` does not exist!");
+        }
+        Table tb = tableFromMetadata(pair.getSecond());
+
+        try (Transaction t = beginTransaction()) {
+            for (Record r : rows) {
+                t.insert(name, r);
             }
-            try(Transaction t = beginTransaction()) {
-                t.createTable(schema, name);
-            } catch (DatabaseException e) {
-                if (e.getMessage().contains("already exists")) return true;
-                throw e;
-            }
-            try (Transaction t = beginTransaction()) {
-                for (Record r : rows) {
-                    t.insert(name, r);
-                }
-            }
-            return false;
+        }
+
+        // refresh histograms so that query cost estimation works
+        tb.buildStatistics(10);
+        return false;
     }
 }

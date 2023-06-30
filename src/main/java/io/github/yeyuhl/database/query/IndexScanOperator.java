@@ -7,6 +7,7 @@ import io.github.yeyuhl.database.table.Record;
 import io.github.yeyuhl.database.table.Schema;
 import io.github.yeyuhl.database.table.stats.TableStats;
 
+
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -79,7 +80,8 @@ class IndexScanOperator extends QueryOperator {
         int order = transaction.getTreeOrder(tableName, columnName);
         TableStats tableStats = transaction.getStats(tableName);
 
-        int count = tableStats.getHistograms().get(columnIndex).copyWithPredicate(predicate, value).getCount();
+        int count = tableStats.getHistograms().get(columnIndex).copyWithPredicate(predicate,
+                    value).getCount();
         // 2 * order entries/leaf node, but leaf nodes are 50-100% full; we use a fill factor of
         // 75% as a rough estimate
         return (int) (height + Math.ceil(count / (1.5 * order)) + count);

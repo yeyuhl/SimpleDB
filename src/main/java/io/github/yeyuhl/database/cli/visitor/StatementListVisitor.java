@@ -4,16 +4,19 @@ import io.github.yeyuhl.database.Database;
 import io.github.yeyuhl.database.Transaction;
 import io.github.yeyuhl.database.cli.parser.*;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 public class StatementListVisitor extends RookieParserDefaultVisitor {
     private Database database;
+    private PrintStream out;
     public List<StatementVisitor> statementVisitors;
 
-    public StatementListVisitor(Database database) {
+    public StatementListVisitor(Database database, PrintStream out) {
         this.database = database;
+        this.out = out;
         this.statementVisitors = new ArrayList<>();
     }
 
@@ -22,33 +25,32 @@ public class StatementListVisitor extends RookieParserDefaultVisitor {
             switch(visitor.getType()) {
                 case BEGIN:
                     if (currTransaction != null) {
-                        System.out.println("WARNING: Transaction already in progress");
+                        this.out.println("WARNING: Transaction already in progress. Ignoring.");
                     } else {
                         currTransaction = this.database.beginTransaction();
                     }
-                    System.out.println("BEGIN");
                     break;
                 case COMMIT:
                     if (currTransaction == null) {
-                        System.out.println("WARNING: No transaction in progress");
+                        this.out.println("WARNING: No transaction in progress");
                     } else {
                         currTransaction.commit();
                         currTransaction.close();
                         currTransaction = null;
                     }
-                    System.out.println("COMMIT");
+                    this.out.println("COMMIT");
                     break;
                 case ROLLBACK:
                     if (currTransaction == null) {
-                        System.out.println("WARNING: No transaction in progress");
+                        this.out.println("WARNING: No transaction in progress");
                     } else {
                         Optional<String> savepointName = visitor.getSavepointName();
                         if(savepointName.isPresent()) {
                             try {
                                 currTransaction.rollbackToSavepoint(savepointName.get());
                             } catch (Exception e) {
-                                e.printStackTrace();
-                                System.out.println("ROLLBACK TO SAVEPOINT failed.");
+                                e.printStackTrace(this.out);
+                                this.out.println("ROLLBACK TO SAVEPOINT failed.");
                                 continue;
                             }
                         } else {
@@ -56,23 +58,23 @@ public class StatementListVisitor extends RookieParserDefaultVisitor {
                             currTransaction = null;
                         }
                     }
-                    System.out.println("ROLLBACK");
+                    this.out.println("ROLLBACK");
                     break;
                 default:
                     if (currTransaction == null) {
                         try (Transaction tmp = database.beginTransaction()) {
-                            visitor.execute(tmp);
+                            visitor.execute(tmp, out);
                             tmp.commit();
                         } catch (Exception e) {
-                            e.printStackTrace();
-                            System.out.println("Operation failed.");
+                            e.printStackTrace(this.out);
+                            this.out.println("Operation failed.");
                         }
                     } else {
                         try {
-                            visitor.execute(currTransaction);
+                            visitor.execute(currTransaction, out);
                         } catch (Exception e) {
-                            e.printStackTrace();
-                            System.out.println("Operation failed.");
+                            e.printStackTrace(this.out);
+                            this.out.println("Operation failed.");
                         }
                     }
                 break;
@@ -140,8 +142,8 @@ public class StatementListVisitor extends RookieParserDefaultVisitor {
             node.childrenAccept(visitor, null);
             this.statementVisitors.add(visitor);
         } catch (UnsupportedOperationException e) {
-            System.out.println("Failed to execute SELECT");
-            System.out.println(e.getMessage());
+            this.out.println("Failed to execute SELECT");
+            this.out.println(e.getMessage());
         }
     }
 

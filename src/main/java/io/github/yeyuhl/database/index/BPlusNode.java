@@ -19,7 +19,7 @@ import java.util.Optional;
  */
 abstract class BPlusNode {
     /**
-     * node.get(k)返回从node查询时k可能所在的叶子节点。
+     * node.get(k)返回对node进行查询时，k可能所在的叶节点
      * 例如，考虑以下B+树（为简洁起见，只显示键；省略了记录id）。
      * <p>
      *                               inner
@@ -178,6 +178,7 @@ abstract class BPlusNode {
         try {
             Buffer buf = p.getBuffer();
             byte b = buf.get();
+            // 根据isLeaf判断是叶节点还是内部节点
             if (b == 1) {
                 return LeafNode.fromBytes(metadata, bufferManager, treeContext, pageNum);
             } else if (b == 0) {

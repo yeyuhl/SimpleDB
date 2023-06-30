@@ -3,6 +3,7 @@ package io.github.yeyuhl.database.query.join;
 import io.github.yeyuhl.database.TransactionContext;
 import io.github.yeyuhl.database.query.QueryOperator;
 
+
 /**
  * Performs an equijoin between two relations on leftColumnName and
  * rightColumnName respectively using the Page Nested Loop Join algorithm.

@@ -9,18 +9,29 @@ import io.github.yeyuhl.database.table.Record;
 import io.github.yeyuhl.database.table.Schema;
 import io.github.yeyuhl.database.table.Table;
 
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
 public class PrettyPrinter {
-    public static void printTable(Table t) {
+    PrintStream out;
+
+    public PrettyPrinter() {
+        this(System.out);
+    }
+
+    public PrettyPrinter(PrintStream out) {
+        this.out = out;
+    }
+
+    public void printTable(Table t) {
         Schema s = t.getSchema();
         printRecords(s.getFieldNames(), t.iterator());
     }
 
-    public static void printSchema(Schema s) {
+    public void printSchema(Schema s) {
         List<Record> records = new ArrayList<>();
         for (int i = 0; i < s.size(); i++) {
             records.add(new Record(Arrays.asList(
@@ -31,7 +42,7 @@ public class PrettyPrinter {
         printRecords(Arrays.asList("column_name", "type"), records.iterator());
     }
 
-    public static void printRecords(List<String> columnNames, Iterator<Record> records) {
+    public void printRecords(List<String> columnNames, Iterator<Record> records) {
         ArrayList<Integer> maxWidths = new ArrayList<>();
         for(String columnName: columnNames) {
             maxWidths.add(columnName.length());
@@ -55,25 +66,25 @@ public class PrettyPrinter {
             printRecord(record, maxWidths);
         }
         if (recordList.size() != 1) {
-            System.out.printf("(%d rows)\n", recordList.size());
+            this.out.printf("(%d rows)\n", recordList.size());
         } else {
-            System.out.printf("(%d row)\n", recordList.size());
+            this.out.printf("(%d row)\n", recordList.size());
         }
     }
 
-    private static void printRow(List<String> values, List<Integer> padding) {
+    private void printRow(List<String> values, List<Integer> padding) {
         for(int i = 0; i < values.size(); i++) {
-            if (i > 0) System.out.print("|");
+            if (i > 0) this.out.print("|");
             String curr = values.get(i);
             if (i == values.size() - 1) {
-                System.out.println(" " + curr);
+                this.out.println(" " + curr);
                 break;
             }
-            System.out.printf(" %-"+padding.get(i)+"s ", curr);
+            this.out.printf(" %-"+padding.get(i)+"s ", curr);
         }
     }
 
-    public static void printRecord(Record record, List<Integer> padding) {
+    public void printRecord(Record record, List<Integer> padding) {
         List<String> row = new ArrayList<>();
         List<DataBox> values = record.getValues();
         for (int i = 0; i < values.size(); i++) {
@@ -87,13 +98,13 @@ public class PrettyPrinter {
         printRow(row, padding);
     }
 
-    private static void printSeparator(List<Integer> padding) {
+    private void printSeparator(List<Integer> padding) {
         for(int i = 0; i < padding.size(); i++) {
-            if (i > 0) System.out.print("+");
+            if (i > 0) this.out.print("+");
             for(int j = 0; j < padding.get(i) + 2; j++)
-                System.out.print("-");
+                this.out.print("-");
         }
-        System.out.println();
+        this.out.println();
     }
 
     public static DataBox parseLiteral(String literal) {

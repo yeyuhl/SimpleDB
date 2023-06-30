@@ -8,7 +8,8 @@ import io.github.yeyuhl.database.cli.parser.RookieParserDefaultVisitor;
 import io.github.yeyuhl.database.common.PredicateOperator;
 import io.github.yeyuhl.database.databox.DataBox;
 
-public class ColumnValueComparisonVisitor extends RookieParserDefaultVisitor {
+
+class ColumnValueComparisonVisitor extends RookieParserDefaultVisitor {
     PredicateOperator op;
     String columnName;
     DataBox value;

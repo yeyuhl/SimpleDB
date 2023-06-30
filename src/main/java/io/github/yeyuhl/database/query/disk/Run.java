@@ -28,6 +28,7 @@ public class Run implements Iterable<Record> {
 
     /**
      * Adds a record to this run.
+     *
      * @param record the record to add
      */
     public void add(Record record) {
@@ -39,10 +40,11 @@ public class Run implements Iterable<Record> {
 
     /**
      * Adds a list of records to this run.
+     *
      * @param records the records to add
      */
     public void addAll(List<Record> records) {
-        for (Record record: records) this.add(record);
+        for (Record record : records) this.add(record);
     }
 
     /**

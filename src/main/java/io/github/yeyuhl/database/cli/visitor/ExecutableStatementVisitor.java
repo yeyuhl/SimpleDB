@@ -4,15 +4,17 @@ import io.github.yeyuhl.database.Transaction;
 import io.github.yeyuhl.database.cli.parser.*;
 import io.github.yeyuhl.database.query.QueryPlan;
 
+
+import java.io.PrintStream;
 import java.util.Optional;
 
 public class ExecutableStatementVisitor extends RookieParserDefaultVisitor {
     StatementVisitor visitor = null;
 
-    public Optional<QueryPlan> execute(Transaction transaction) {
+    public Optional<QueryPlan> execute(Transaction transaction, PrintStream out) {
         Optional<QueryPlan> qp = visitor.getQueryPlan(transaction);
         if (qp.isPresent()) return qp;
-        visitor.execute(transaction);
+        visitor.execute(transaction, out);
         return Optional.empty();
     }
 

@@ -184,7 +184,7 @@ class LeafNode extends BPlusNode {
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data, float fillFactor) {
         // 叶节点的能存储的最大records数
-        int maxRecords = (int) Math.floor(2 * metadata.getOrder() * fillFactor);
+        int maxRecords = (int) Math.ceil(2 * metadata.getOrder() * fillFactor);
         while (keys.size() < maxRecords && data.hasNext()) {
             Pair<DataBox, RecordId> pair = data.next();
             keys.add(pair.getFirst());
@@ -206,11 +206,10 @@ class LeafNode extends BPlusNode {
         return result;
     }
 
-
     @Override
     public void remove(DataBox key) {
         int index = keys.indexOf(key);
-        if (index > 0) {
+        if (index >= 0) {
             keys.remove(index);
             rids.remove(index);
             sync();
@@ -397,8 +396,10 @@ class LeafNode extends BPlusNode {
         // 实现fromBytes方法需要重用已有的页，而不是获取一个新的页，参考InnerNode.fromBytes方法
         Page page = bufferManager.fetchPage(treeContext, pageNum);
         Buffer buffer = page.getBuffer();
+
         byte nodeType = buffer.get();
         assert (nodeType == (byte) 1);
+
         List<DataBox> keys = new ArrayList<>();
         List<RecordId> rids = new ArrayList<>();
         long rs = buffer.getLong();

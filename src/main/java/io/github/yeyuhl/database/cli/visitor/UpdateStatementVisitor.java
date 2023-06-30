@@ -5,8 +5,11 @@ import io.github.yeyuhl.database.cli.parser.ASTColumnName;
 import io.github.yeyuhl.database.cli.parser.ASTExpression;
 import io.github.yeyuhl.database.cli.parser.ASTIdentifier;
 import io.github.yeyuhl.database.databox.impl.BoolDataBox;
-import io.github.yeyuhl.database.query.aggr.DataFunction;
+import io.github.yeyuhl.database.query.expr.Expression;
+import io.github.yeyuhl.database.query.expr.ExpressionVisitor;
 import io.github.yeyuhl.database.table.Schema;
+
+import java.io.PrintStream;
 
 public class UpdateStatementVisitor extends StatementVisitor {
     public String tableName;
@@ -31,15 +34,15 @@ public class UpdateStatementVisitor extends StatementVisitor {
     }
 
     @Override
-    public void execute(Transaction transaction) {
+    public void execute(Transaction transaction, PrintStream out) {
         try {
             Schema schema = transaction.getSchema(tableName);
             ExpressionVisitor ev = new ExpressionVisitor();
             this.expr.jjtAccept(ev, schema);
-            DataFunction exprFunc = ev.build();
-            DataFunction condFunc;
+            Expression exprFunc = ev.build();
+            Expression condFunc;
             if (this.cond == null) {
-                condFunc = new DataFunction.LiteralDataSource(new BoolDataBox(true));
+                condFunc = Expression.literal(new BoolDataBox(true));
             } else {
                 ExpressionVisitor condEv = new ExpressionVisitor();
                 this.cond.jjtAccept(condEv, schema);
@@ -53,10 +56,10 @@ public class UpdateStatementVisitor extends StatementVisitor {
                     exprFunc::evaluate,
                     condFunc::evaluate
             );
-            System.out.println("UPDATE");
+            out.println("UPDATE");
         } catch (Exception e) {
             e.printStackTrace();
-            System.out.println("Failed to execute UPDATE.");
+            out.println("Failed to execute UPDATE.");
         }
     }
 

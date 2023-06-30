@@ -405,25 +405,25 @@ public class BPlusTree {
         LeafNode currNode;
         Iterator<RecordId> currIter;
 
-        public BPlusTreeIterator(LeafNode leafNode) {
-            this.currNode = leafNode;
-            this.currIter = leafNode.scanAll();
+        BPlusTreeIterator(LeafNode node) {
+            currNode = node;
+            currIter = currNode.scanAll();
         }
 
-        public BPlusTreeIterator(LeafNode leafNode, DataBox key) {
-            this.currNode = leafNode;
-            this.currIter = leafNode.scanGreaterEqual(key);
+        BPlusTreeIterator(LeafNode node, DataBox key) {
+            currNode = node;
+            currIter = node.scanGreaterEqual(key);
         }
-
         @Override
         public boolean hasNext() {
             if (currIter.hasNext()) {
                 return true;
-            } else {
-                // 如果当前节点没有下一个元素，就找到下一个叶子节点
-                Optional<LeafNode> nextNode = currNode.getRightSibling();
-                if (nextNode.isPresent()) {
-                    currNode = nextNode.get();
+            }
+            else {
+                // currNode has been scanned over
+                Optional<LeafNode> opt_rightSibling = currNode.getRightSibling();
+                if (opt_rightSibling.isPresent()) {
+                    currNode = opt_rightSibling.get();
                     currIter = currNode.scanAll();
                     return true;
                 } else {
@@ -436,7 +436,8 @@ public class BPlusTree {
         public RecordId next() {
             if (currIter.hasNext()) {
                 return currIter.next();
-            } else {
+            }
+            else {
                 throw new NoSuchElementException();
             }
         }
