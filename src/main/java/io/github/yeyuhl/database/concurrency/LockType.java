@@ -1,29 +1,47 @@
 package io.github.yeyuhl.database.concurrency;
 
 /**
- * Utility methods to track the relationships between different lock types.
+ * LockType提供跟踪不同锁类型之间关系的实用方法。
+ *
+ * @author yeyuhl
+ * @since 2023/7/23
  */
 public enum LockType {
-    S,   // shared
-    X,   // exclusive
-    IS,  // intention shared
-    IX,  // intention exclusive
-    SIX, // shared intention exclusive
-    NL;  // no lock held
+    S,   // 共享锁
+    X,   // 独占锁（排他锁）
+    IS,  // 意图共享
+    IX,  // 意图独占
+    SIX, // 共享意图独占
+    NL;  // 没有持有锁
 
     /**
-     * This method checks whether lock types A and B are compatible with
-     * each other. If a transaction can hold lock type A on a resource
-     * at the same time another transaction holds lock type B on the same
-     * resource, the lock types are compatible.
+     * 此方法检查锁类型A和B是否彼此兼容。
+     * 如果一个事务可以在某个资源上持有类型A的锁，同时另一个事务在同一资源上持有类型B的锁，则这些锁类型是兼容的。
      */
     public static boolean compatible(LockType a, LockType b) {
         if (a == null || b == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
-
-        return false;
+        switch (a) {
+            case NL:
+                return true;
+            // IS和X不兼容
+            case IS:
+                return !(b == X);
+            // IX和NL、IS、IX兼容
+            case IX:
+                return (b == NL) || (b == IS) || (b == IX);
+            //  S和NL、IS、S兼容
+            case S:
+                return (b == NL) || (b == IS) || (b == S);
+            case SIX:
+                return (b == NL) || (b == IS);
+            // X和NL兼容
+            case X:
+                return (b == NL);
+            default:
+                throw new UnsupportedOperationException("bad lock type");
+        }
     }
 
     /**
@@ -35,42 +53,71 @@ public enum LockType {
             throw new NullPointerException("null lock type");
         }
         switch (a) {
-        case S: return IS;
-        case X: return IX;
-        case IS: return IS;
-        case IX: return IX;
-        case SIX: return IX;
-        case NL: return NL;
-        default: throw new UnsupportedOperationException("bad lock type");
+            case S:
+                return IS;
+            case X:
+                return IX;
+            case IS:
+                return IS;
+            case IX:
+                return IX;
+            case SIX:
+                return IX;
+            case NL:
+                return NL;
+            default:
+                throw new UnsupportedOperationException("bad lock type");
         }
     }
 
     /**
-     * This method returns if parentLockType has permissions to grant a childLockType
-     * on a child.
+     * 判断parentLockType是否有权向子级授予childLockType。
      */
     public static boolean canBeParentLock(LockType parentLockType, LockType childLockType) {
         if (parentLockType == null || childLockType == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
-
-        return false;
+        switch (parentLockType) {
+            case NL:
+                return childLockType == NL;
+            case IS:
+                return childLockType == NL || childLockType == IS || childLockType == S;
+            case IX:
+                return true;
+            case S:
+                return childLockType == NL;
+            case SIX:
+                return childLockType == NL || childLockType == X || childLockType == IX || childLockType == SIX;
+            case X:
+                return childLockType == NL;
+            default:
+                throw new UnsupportedOperationException("bad lock type");
+        }
     }
 
     /**
-     * This method returns whether a lock can be used for a situation
-     * requiring another lock (e.g. an S lock can be substituted with
-     * an X lock, because an X lock allows the transaction to do everything
-     * the S lock allowed it to do).
+     * 判断一个锁是否可以用于替代另一个锁（例如，S锁可以用X锁代替），substitute替代required。
      */
     public static boolean substitutable(LockType substitute, LockType required) {
         if (required == null || substitute == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
-
-        return false;
+        switch (substitute) {
+            case NL:
+                return required == NL;
+            case IS:
+                return required == NL || required == IS;
+            case IX:
+                return required == NL || required == IS || required == IX;
+            case S:
+                return required == NL || required == IS || required == S;
+            case SIX:
+                return !(required == X);
+            case X:
+                return true;
+            default:
+                throw new UnsupportedOperationException("bad lock type");
+        }
     }
 
     /**
@@ -83,13 +130,20 @@ public enum LockType {
     @Override
     public String toString() {
         switch (this) {
-        case S: return "S";
-        case X: return "X";
-        case IS: return "IS";
-        case IX: return "IX";
-        case SIX: return "SIX";
-        case NL: return "NL";
-        default: throw new UnsupportedOperationException("bad lock type");
+            case S:
+                return "S";
+            case X:
+                return "X";
+            case IS:
+                return "IS";
+            case IX:
+                return "IX";
+            case SIX:
+                return "SIX";
+            case NL:
+                return "NL";
+            default:
+                throw new UnsupportedOperationException("bad lock type");
         }
     }
 }

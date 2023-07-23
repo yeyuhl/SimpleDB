@@ -9,7 +9,7 @@ import java.util.List;
  * This class represents the full name of a resource. The name of a resource is
  * an ordered tuple of strings, and any subsequence of the tuple starting with
  * the first element is the name of a resource higher up on the hierarchy.
- *
+ * <p>
  * For example, a page may have the name ("database", "someTable", 10), where
  * "someTable" is the name of the table the page belongs to, and 10 is the page
  * number. We store this as the list ["database", "someTable", "10"] and its
@@ -30,7 +30,7 @@ public class ResourceName {
 
     /**
      * @param parent This resource's parent, or null if this resource has no parent
-     * @param name The name of this resource.
+     * @param name   The name of this resource.
      */
     ResourceName(ResourceName parent, String name) {
         this.names = new ArrayList<>(parent.names);

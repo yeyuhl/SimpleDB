@@ -594,3 +594,345 @@ join6 {B，C} SMJ A (估计成本：18,000)
 ### Optimal Plan Selection
 
 最后的最后，要实现optimizer的最外层驱动方法——QueryPlan中的execute方法。该方法会利用到前面实现的两个方法，并且需要添加剩余的group by和project运算符，这些运算符是查询的一部分，但是还没添加到查询计划中。值得注意的是，QueryPlan中的表被保存在变量tableNames中。
+
+# 并发
+
+## Transactions
+
+考虑多人同时访问数据库（并发），对某一数据进行读写的情况，会产生以下问题：
+
+- **读取不一致（读写冲突）**：另一个用户要对数据进行更新，还没更新完，另一用户就对该数据进行读取。
+
+- **丢失更新（写入冲突）**：两个用户同时对某一数据进行更新。
+
+- **脏读（读写冲突）**：某一用户读取了未commit（被回滚）的数据。比如说某一用户更新了数据，但被中止操作，要求回滚。在回滚前有一用户读取了这部分数据。
+
+- **不可重复读（读写冲突）**：某一用户读取同一数据的两个不同值，因为另一个用户在两次读取之间更新了该数据。
+
+
+![](https://yeyu-1313730906.cos.ap-guangzhou.myqcloud.com/PicGo20230709200144.png)
+
+但并发并不是一无是处，并发可以**增加数据库吞吐量**（每秒事务数）和**减少延迟**（每个事务响应时间）。
+
+为了解决以上问题，我们提出了**事务**这一概念，即用户定义的一个数据库操作序列，要么做要么不做，不存在你中间状态，是一个不可分割的工作单位。定义事务的语句一般有三条：**BEGIN TRANSACTION、COMMIT、ROLLBACK**，事务通常是以BEGIN TRANSACTION开始，以COMMIT或ROLLBACK结束。COMMIT是提交，即提交事务的所有操作。而ROLLBACK是回滚，即事务不能继续执行，将已经完成的操作全部撤销，回滚到事务开始时的状态。
+
+事务可以是一条SQL语句、一组SQL语句或者整个程序。事务有四个特性：**原子性**、**一致性**、**隔离性**、**持续性**。
+
+- **原子性**：事务中的操作要么做要么不做。
+- **一致性**：数据库必须从一个一致性状态变到另一个一致性状态，当数据库只包含成功事务提交的结果时称该数据库处于一致性状态。
+- **隔离性**：一个事务的执行不能被其他事务干扰。
+- **持续性**：也称永久性，事务一旦提交，它对数据库中的数据的改变是永久性的。
+
+事务是**并发控制**的基本单位，保证事务的ACID特性是事务处理的重要任务，而事务的ACID特性可能遭到破坏的原因之一是多个事务对数据库的并发操作造成的。为了保证事务的隔离性和一致性，数据库管理系统需要对并发操作进行正确调度。此处我们先重点讨论事务的**隔离性**。事务中涉及的操作有： **Begin**, **Read**, **Write**, **Commit** 和 **Abort**。确保隔离最简单的方法就是在开始下一个事务之前，将当前事务中的所有操作完成，即**串行时间表**。
+
+![](https://yeyu-1313730906.cos.ap-guangzhou.myqcloud.com/PicGo20230709214624.png)
+
+理想情况下，我们既希望获得与串行调度相同的结果（因为已知串行调度是正确的），又希望获得并行调度的优秀性能。基本上，我们正在寻找一个相当于串行时间表的时间表。为了使时间表等效，它们必须满足以下三个规则：
+
+- 它们涉及相同的事务。
+
+- 在各个事务中操作的排序方式相同。
+
+- 每个时间表都能使数据库保持在相同的状态。
+
+
+如果我们找到一个其结果相当于串行调度的调度，我们称该调度为**可串行化的**。
+
+![](https://yeyu-1313730906.cos.ap-guangzhou.myqcloud.com/PicGo20230709215052.png)
+
+一个调度Sc在保证冲突操作的次序不变的情况下，通过交换两个事务不冲突操作的次序得到另一个调度Sc'，如果Sc'是串行的，称调度Sc为**冲突可串行化的调度**。若一个调度是冲突可串行化，则一定是可串行化的调度。可以用这种方法来判断一个调度是否是冲突可串行化。要使两个操作发生冲突，它们必须满足以下三个规则：
+
+- 这些操作来自不同的事务。
+
+- 两个操作都在同一资源上运行。
+
+- 至少有一个操作是写操作。
+
+
+![](https://yeyu-1313730906.cos.ap-guangzhou.myqcloud.com/PicGo20230709215520.png)
+
+## Locking
+
+实现并发控制有很多方法，常见的有**封锁(locking)**、**时间戳(timestamp)**、**乐观控制法(optimisitc scheduler)** 和 **多版本并发控制(MVCC)**。这里详细介绍封锁locking，封锁就是事务T在对某个数据对象操作之前，先向系统发出请求，对其加锁。加锁后事务T就对该数据对象有了一定控制，在事务T释放它的锁之前，其他事务不能更新此数据对象。封锁类型又分为：
+
+- **排他锁（写锁）**：若事务T对数据对象A加上X锁，则只允许T读取和修改A，其他任何事务都不能再对A加任何类型的锁，直到T释放A上的锁为止。
+- **共享锁（读锁）**：若事务T对数据对象A加上S锁，则事务T可以读A但不能修改A，其他事务只能再对A加S锁，而不能加X锁，直到T释放A上的S锁为止。
+
+不过上锁不意味着万事大吉，假设事务T1给数据R1上锁，事务T2给数据R2上锁。此时T1访问R2，T2访问R1。T1等待T2给R2解锁，T2又在等待T1给R1解锁。T1和T2两个事务永远不能结束，这就形成了**死锁**。在操作系统中，同时满足以下四个条件即可引起死锁：
+
+- **互斥**：线程对于需要的资源进行互斥的访问（例如一个线程抢到锁）。
+
+- **持有并等待**：线程持有了资源（例如已将持有的锁），同时又在等待其他资源（例如，需要获得的锁）。
+
+- **非抢占**：线程获得的资源（例如锁），不能被抢占。
+
+- **循环等待**：线程之间存在一个环路，环路上每个线程都额外持有一个资源，而这个资源又是下一个线程要申请的。
+
+
+回到数据库系统中，预防死锁并不适合数据库系统（会造成许多事务的中止），因此数据库一般采用**诊断与解除死锁**的方法。诊断的方法如下：
+
+- **超时法**：如果一个事务的等待时间超过了规定的时限，就认为发生了死锁（缺点是可能误判或者是时限设置太长死锁发生后不能及时发现）。
+
+- **等待图法**：事务等待图是一个有向图G=(T,U)，T是结点的集合，每个结点表示正运行的事务；U是边的集合，每条边表示事务等待的情况。若T2等待T1，则在T1、T2之间画一条有向边，从T2指向T1。并发控制子系统周期性地（比如每隔数秒）生成事务等待图，并进行检测。如果发现图中存在回路，则表示系统中出现了死锁。
+
+  ![](https://yeyu-1313730906.cos.ap-guangzhou.myqcloud.com/PicGo/20230717215654.png)
+
+
+而解除死锁的方法则是选择一个处理死锁代价最小的事务，将其撤销，释放此事务所持有的所有的锁，使其他事务得以继续运行下去。
+
+为保证并发调度的正确性，数据库管理系统的并发控制机制必须提供一定的额手段来保证调度是可串行化的，因此采用**Two Phase Locking，即两段锁协议**。所谓两段锁协议是指所有事务必须分两个阶段对数据项上锁和解锁。
+
+- 事务在读取之前必须获取 S（共享）锁，在写入之前必须获取 X（排他）锁。
+- 在释放一个封锁之后，事务不再申请和获得任何其他封锁。
+
+![](https://yeyu-1313730906.cos.ap-guangzhou.myqcloud.com/PicGo/20230717214359.png)
+
+不过上面的两段锁协议存在弊端，比如说它不能防止级联中止，举个例子：
+
+T1更新资源A，然后释放A上的锁；T2读取资源A；T1中止；此时T2也应该中止，因为它读取了A中uncommitted的值。
+
+为了解决这个问题，我们将使用**Strict Two Phase Locking**。Strict Two Phase Locking和Two Phase Locking的不同之处在于，前者会在事务完成时会一起释放所有锁。
+
+现在我们知道了锁的用途以及锁的类型。接下来我们就要了解**Lock Manager**如何管理锁定和解锁（或获取和释放）请求以及它如何决定何时授予锁定。LM会维护一个哈希表，以被锁定资源的名称为键。每个条目都包含一个授予集（一组授予的锁/持有每个资源锁的事务）、锁类型（S 或 X 或我们尚未介绍的类型）和一个等待队列（由于与已授予的锁冲突而无法满足的锁请求队列）。参见下图：
+
+![](https://yeyu-1313730906.cos.ap-guangzhou.myqcloud.com/PicGo/20230717220036.png)
+
+当锁请求到达时，Lock Manager检查授予集中或等待队列中是否有任何 Xact 想要冲突锁。如果有，则请求者被放入等待队列。如果没有，则请求者被授予锁并放入授予集中。此外，Xacts 可以请求锁升级：此时具有共享锁的 Xact 可以请求升级为排他锁。Lock Manager会将此升级请求添加到队列的前面。
+
+最后，当我们了解了锁的概念，我们还要弄清楚实际要上锁的内容。我们想要锁定包含我们想要写入的数据的元组吗？还是page？还是table？或者甚至可能是整个数据库，以便在我们处理该数据库时没有事务可以写入该数据库？我们做出的决定会根据我们所处的情况而有很大不同。这就是我们要讨论的**Lock Granularity**，即**锁的颗粒度**。让我们将数据库系统想象成下面的树：
+
+![](https://yeyu-1313730906.cos.ap-guangzhou.myqcloud.com/PicGo/20230717220654.png)
+
+最顶层是数据库。下一级是tables，后面是table的pages。最后，表中的records是树中的最低层级。请记住，当我们在一个节点上放置锁时，我们也隐式地锁定了它的所有子节点。因此，可以看到我们如何向数据库系统指定我们真正希望将锁放置在哪个层级。这种多颗粒度的锁允许我们在树的不同层级放置锁。我们将有以下新的lock modes：
+
+- **IS**：意图以更细的颗粒度获取 S 锁。
+
+- **IX**：意图以更细的颗粒度获取 X 锁。注意：两个事务可以在同一资源上放置 IX 锁，此时它们并不会直接冲突，它们可以在两个不同的子事务上放置 X 锁。
+
+- **SIX**：像S和IX的结合。如果我们想要阻止任何其他事务修改较低层级的资源但希望允许它们读取较低层级的资源，那么这非常有用。使用SIX，我们在这个层级声明了一个共享锁；现在，没有其他事务可以对该子树中的任何内容声明排他锁（但是，它可能可以对该事务未修改的内容声明共享锁，即我们不会放置 X 锁的内容。这留给数据库系统来处理。）
+
+
+lock modes之间的兼容性如下图所示：
+
+![](https://yeyu-1313730906.cos.ap-guangzhou.myqcloud.com/PicGo/20230717221801.png)
+
+既然有了Lock Granularity，我们也可以对前面的Two Phase Locking进行改造，获得**Multiple Granularity Locking Protocol**：
+
+- 每个 Xact 必须从层次结构的根节点开始。
+
+- 要获得节点上的 S 或 IS ，必须在父节点上持有 IS 或 IX。
+
+- 要在节点上获取 X 或 IX ，必须在父节点上保留 IX 或 SIX。
+
+- 必须按自下而上的顺序释放锁。
+
+- 必须满足两端锁协议和兼容性规定。
+
+- 协议是正确的，因为它相当于直接在层次结构的叶层级设置锁。
+
+
+## Code
+
+### Layers
+
+![](https://yeyu-1313730906.cos.ap-guangzhou.myqcloud.com/PicGo/20230719144028.png)
+
+- **LockManager**：管理所有的锁，将每个资源视为独立的（不考虑资源的层次结构）。LockManager负责排队逻辑，必要时阻塞事务或解除阻塞，并且LockManager是事务是否拥有某个锁的唯一权威证明。如果说LockManager说T1拥有X(database)，那么T1就拥有这个锁。
+
+- **LockContext**：在每一个LockManager上面都有一个LockContext对象集合，每个LockContext代表一个可锁定对象（可以是page，也可以是table）。LockContext对象根据层次结构连接（例如，表的 LockContext 将数据库上下文作为父对象，将其页面上下文作为子对象）。所有 LockContext 对象都共享一个 LockManager，每个上下文都会对其方法执行多粒度约束（例如，如果事务试图请求 X(table)而不请求 IX(database)，就会出现异常）。
+
+- **LockUtil**：顾名思义，LockUtil是一个工具类，位于 LockContext 对象集合之上，负责获取数据库使用的每个 S 或 X 请求所需的所有意图锁（例如，如果请求 S(page)，该层将负责请求 IS(database)，必要时请求 IS(table)）。
+
+
+### Queuing
+
+#### LockType
+
+一个事务中的锁有如下类型：
+
+- **S(A)**：可以读取A以及A的所有后代。
+
+- **X(A)**：可以读写A以及A的所有后代。
+
+- **IS(A)**：可以请求A的所有后代的共享锁和意图共享锁。
+
+- **IX(A)**：可以请求A的所有后代的锁。
+
+- **SIX(A)**：可以执行S(A)或IX(A)允许它执行的任何操作，除了请求 A 的后代上的 S、IS 或 SIX锁，因为这将是多余的（这与前文提及的SIX有出入，前文的SIX可以请求A的子节点上的SIX锁，而这里不允许这样做，这是因为SIX子节点的S是多余的）。
+
+
+需要实现以下方法：
+
+- **compatible(A,B)** 检查A锁和B锁是否兼容——两个事务对于同一资源，是否能一个事务拥有A锁而另一个事务拥有B锁？例如两个事务可以在同一资源上拥有 S 锁，所以 compatible(S, S) = true，但两个事务不能在同一资源上拥有 X 锁，所以 compatible(X, X) = false。
+
+- **canBeParentLock(A,B)** 如果资源上的A锁允许事务获取子资源上的B锁，则返回 true。例如，要在表上获得S锁，我们必须（至少）在表的父表（即数据库）上拥有 IS 锁。因此，canBeParentLock(IS, S) = true。
+
+- **substitutable(substitute,required)** 检查是否可以用一种锁（"替代"）代替另一种锁（"必需"）。只有当拥有substitute的事务能做拥有required的事务能做的所有事情时，才会出现这种情况。换而言之，当一个事务请求所需的锁，如果我们偷偷给它替代锁，会有问题吗？例如，如果一个事务请求 X 锁，而我们悄悄给了它一个 S 锁，那么如果该事务试图写入资源，就会出现问题。因此，substitutable(S, X) = false。
+
+
+#### LockManager
+
+需要实现以下方法：
+
+- **acquireAndRelease** 该方法以原子的形式（从用户的角度）获取一个锁并释放零个或多个锁。该方法优先于任何排队的请求（即使有队列，它也应该继续进行，如果无法继续，则将其放置在队列的前面）。
+- **acquire** 该方法是LockManager的标准获取方法。它允许事务请求一个锁，如果没有队列并且该请求与现有锁兼容，则授予该请求。否则，它应该将请求放入队列（在后面）并阻止事务。我们不允许隐式锁升级，因此在事务已经拥有 S 锁的资源上请求 X 锁是无效的。
+- **release** 该方法是LockManager的标准释放方法。它允许事务释放它持有的一个锁。
+- **promote** 此方法允许事务显式提升/升级持有的锁。事务用更强的锁对该资源持有的锁进行替换。该方法优先于任何排队的请求（即使有队列，它也应该继续进行，如果无法继续，则将其放置在队列的前面）。要注意的是，我们不允许升级到 SIX，该类型的请求应发送至 acquireAndRelease。这是因为在 SIX 升级期间，我们可能还需要释放多余的锁，因此我们需要使用 acquireAndRelease 来处理这些升级。
+- **getLockType** 这是查询LockManager的主要方式，并返回事务对特定资源的锁类型。这在上一步中已实现。
+
+#### Queues
+
+每当对锁的请求无法满足时（因为它与其它事务在资源上已有的锁冲突，或者因为该资源上存在锁请求队列并且该操作不具有高于队列的优先级），则应该被放置在该资源的队列上（除非另有指定，否则放在后面），并且发出请求的事务应该被阻止。每个资源队列都独立于其它队列进行处理，并且必须释放资源上的锁后再进行处理，具体方式如下：
+
+- 考虑队列前面的请求，如果它不与资源上的任何现有的锁冲突，则应将其从队列中删除，并且：
+
+  - 发出请求的事务应该被授予锁
+
+  - 请求所声明应释放的所有锁均已释放
+
+  - 发出请求的事务应该被解锁
+
+- 应重复上一步，直到无法满足队列中的第一个请求或队列为空。
+
+
+#### Synchronization
+
+LockManager 的方法具有同步块，以确保对 LockManager 的调用是串行的并且没有调用的交错。应该确保方法中对LockManager状态的所有访问（查询和修改）都在一个同步块内，例如：
+
+```java
+// Correct, use a single synchronized block
+void acquire(...) {
+    synchronized (this) {
+        ResourceEntry entry = getResourceEntry(name); // fetch resource entry
+        // do stuff
+        entry.locks.add(...); // add to list of locks
+    }
+}
+
+// Incorrect, multiple synchronized blocks
+void acquire(...) {
+    synchronized (this) {
+        ResourceEntry entry = getResourceEntry(name); // fetch resource entry
+    }
+    // first synchronized block ended: another call to LockManager can start here
+    synchronized (this) {
+        // do stuff
+        entry.locks.add(...); // add to list of locks
+    }
+}
+
+// Incorrect, doing work outside of the synchronized block
+void acquire(...) {
+    ResourceEntry entry = getResourceEntry(name); // fetch resource entry
+    // do stuff
+    // other calls can run while the above code runs, which means we could
+    // be using outdated lock manager state
+    synchronized (this) {
+        entry.locks.add(...); // add to list of locks
+    }
+}
+```
+
+事务在被阻塞时会阻塞整个线程，这意味着不能在同步块内阻塞事务（这将阻止对 LockManager 的任何其他调用运行，直到事务被解除阻塞……但事实并非如此，因为 LockManager 是用来解锁事务的）。
+
+要阻止事务，请在同步块内调用 Transaction#prepareBlock，然后在同步块外调用 Transaction#block。 Transaction#prepareBlock 需要位于同步块中，以避免竞争条件，即事务在离开同步块的时刻和实际阻塞的时刻之间可能会出列。
+
+### Multigranularity
+
+#### LockContext
+
+LockContext类代表层次结构中的单个资源；这是所有多粒度操作（例如在获取或执行锁升级之前强制你拥有适当的意向锁）的实现位置。
+
+需要实现以下方法：
+
+- **acquire** 在确保满足所有多粒度约束后，此方法通过底层 LockManager 执行获取。例如，如果事务具有 IS(database)并请求X(table)，则必须抛出适当的异常（请参阅上面方法的注释）。如果事务具有SIX锁，则该事务在任何后代资源上持有 IS/S 锁都是多余的。因此，在我们的实现中，如果祖先有SIX锁，我们就禁止获取 IS/S 锁，并将其视为无效请求。
+
+- **release** 在确保释放后仍然满足所有多粒度约束后，此方法通过底层 LockManager 执行释放。例如，如果事务具有X(table)并尝试释放 IX(database)，则必须抛出适当的异常（请参阅上面方法的注释）。
+
+- **promote** 在确保满足所有多粒度约束后，此方法通过底层 LockManager 执行锁升级。例如，如果事务具有IS(database)并请求从S(table)升级到X(table)，则必须抛出适当的异常（请参阅上面方法的注释）。在升级到SIX（从IS/IX/S）的特殊情况下，你应该同时释放 S/IS 类型的所有后代锁，因为当持有 SIX 锁时，我们不允许在后代上拥有 IS/S 锁。如果祖先有SIX锁，你还应该禁止升级到SIX锁，因为这是多余的。在将祖先提升到SIX锁而后代持有SIX锁的情况下，这仍然允许在SIX锁下持有SIX锁。这虽然是多余的，但修复它既混乱（必须将所有后代SIX锁与IX锁交换）又毫无意义（无论如何，你仍然持有后代锁），所以我们就保持原样。
+
+- **escalate** 此方法将锁升级到当前级别（有关更多详细信息，请参阅下文）。由于允许多个事务（在不同线程上运行）交错执行多个 LockManager 的调用，因此你必须确保仅使用对 LockManager 的一次变异调用，并且仅从 LockManager 请求有关当前事务的相关信息（因为与任何其他事务相关的信息在查询和获取时可能会发生变化）。
+
+- **getExplicitLockType** 此方法返回当前级别显式持有的锁的类型。例如，如果事务持有 X(db)，则 dbContext.getExplicitLockType(transaction) 应返回 X，但 tableContext.getExplicitLockType(transaction) 应返回 NL（没有显式持有锁）。
+
+- **getEffectiveLockType** 此方法返回当前级别隐式或显式持有的锁的类型。例如，如果一个事务有 X(db)：
+
+  - dbContext.getEffectiveLockType(transaction) 应该返回 X
+
+  - tableContext.getEffectiveLockType(transaction) 还应该返回 X（因为我们在整个数据库上显式拥有 X 锁，因此在每个表上隐式拥有 X 锁）。
+
+
+由于意向锁不会隐式地将获取锁的权限授予较低级别，因此如果事务只有 SIX（database），则 tableContext.getEffectiveLockType(transaction) 应该返回 S（而不是SIX），因为该事务通过以下方式在表上隐式拥有S：SIX锁，但不是SIX锁的IX部分（仅在数据库级别可用）。显式锁类型可以是一种类型，而有效锁类型可以是不同的锁类型，特别是如果祖先有SIX锁。
+
+
+LockContext 对象都共享一个底层 LockManager 对象。 parentContext方法返回当前上下文的父级（例如调用tableContext.parentContext()时返回数据库的LockContext），childContext方法返回传入名称的子锁上下文（例如tableContext.childContext(0L)返回表的第0页的LockContext）。每个资源只有一个LockContext：多次使用相同的参数调用childContext会返回相同的对象。出于性能原因，我们不会立即为表的每个页面创建LockContext。相反，我们在创建相应的 Page 对象时才创建它们。
+
+锁升级是从许多精细锁（层次结构中较低级别的锁）升级到单个较粗略锁（较高级别的锁）的过程。例如，我们可以将事务持有的多个页锁升级为表级别的单个锁。我们通过 LockContext#escalate 执行锁升级。对此方法的调用应解释为将后代上的所有锁（这些是精细锁）升级为调用上下文升级时使用的一个锁（粗略锁）的请求。精细锁可以是意向锁和常规锁的任意组合，但我们将粗略锁限制为 S 或 X。
+
+例如，如果我们有以下锁：IX(database)，SIX(table)，X(page 1)，X(page 2)，X(page 4)，并调用 tableContext.escalate(transaction)，我们应该将页级锁替换为包含它们的表上的单个锁：
+
+![](https://yeyu-1313730906.cos.ap-guangzhou.myqcloud.com/PicGo/20230720095155.png)
+
+同样，如果我们调用 dbContext.escalate(transaction)，我们应该将页级锁和表级锁替换为包含它们的数据库上的单个锁：
+
+![](https://3248067225-files.gitbook.io/~/files/v0/b/gitbook-x-prod.appspot.com/o/spaces%2F-MFVQnrLlCBowpNWJo1E%2Fuploads%2Fgit-blob-5ce4b3a0fe666867c554f74df85455942421c3bc%2Fproj4-escalate2%20(1)%20(1)%20(2)%20(2)%20(3)%20(3).png?alt=media&token=8427ac3e-c038-4eaf-aa4b-667865f4963f)
+
+请注意，在这方面，升级到X锁总是“有效”：拥有粗略的 X 锁肯定包含拥有一堆更精细的锁。但是，这会带来其他复杂性：如果事务之前仅持有更精细的 S 锁，则它不会拥有持有 X 锁所需的 IX 锁，并且升级到 X 会不必要地减少允许的并发量。因此，我们要求仅升级到仍包含替换的更精细锁的最低许可的锁类型（S 或 X 之间）（因此，如果我们只有 IS/S 锁，我们应该升级到 S，而不是 X）。另请注意，由于我们仅升级到 S 或 X，因此仅具有IS(database)的事务将升级到 S(database)。虽然只有IS(database)的事务在技术上没有较低级别的锁，但在此级别保持意向锁的唯一目的是获取较低级别的普通锁，而升级的目的是避免拥有较低级别的锁。因此，我们不允许升级到意向锁 (IS/IX/SIX)。
+
+#### LockUtil
+
+LockContext 类为我们强制执行多粒度约束，但在我们的数据库中使用它有点麻烦：无论我们想要请求什么锁，我们都必须处理请求适当的意向锁等。为了简化将locking集成到我们的代码库中，我们定义了ensureSufficientLockHeld方法。此方法的使用方式类似于声明性语句。例如，假设我们有一些读取整个表的代码。要添加locking，我们可以这样做：
+
+```java
+LockUtil.ensureSufficientLockHeld(tableContext, LockType.S);
+
+// any code that reads the table here
+```
+
+在ensureSufficientLockHeld行之后，我们可以假设当前事务（Transaction.getTransaction()返回的事务）有权读取tableContext表示的资源以及任何子级（所有页面）。
+
+我们可以连续调用它几次：
+
+```java
+LockUtil.ensureSufficientLockHeld(tableContext, LockType.S);
+LockUtil.ensureSufficientLockHeld(tableContext, LockType.S);
+
+// any code that reads the table here
+```
+
+或以任意顺序编写多个语句：
+
+```java
+LockUtil.ensureSufficientLockHeld(pageContext, LockType.S);
+LockUtil.ensureSufficientLockHeld(tableContext, LockType.S);
+LockUtil.ensureSufficientLockHeld(pageContext, LockType.S);
+
+// any code that reads the table here
+```
+
+并且不应抛出任何错误，在调用结束时，我们应该能够读取所有表。
+
+请注意，调用者并不关心事务实际拥有哪些锁：如果我们为事务提供数据库上的 X 锁，则事务确实有权读取所有表。但这不允许太多的并发性（如果与2PL一起使用，实际上会强制执行串行调度），因此我们另外规定ensureSufficientLockHeld应该授予尽可能少的额外权限：如果S锁足够，我们应该让事务获取S锁，而不是X锁，但如果事务已经有X锁，我们应该不管它（ensureSufficientLockHeld永远不应该减少事务拥有的权限，在调用之前它应该让事务至少像以前一样多）。我们建议将此方法的逻辑分为两个阶段：确保我们在祖先上拥有适当的锁，并获取资源上的锁。在某些情况下你需要promote和escalate（这些情况并不相互排斥）。
+
+#### Two-Phase Locking
+
+此时，你应该有一个工作系统来获取和释放数据库中不同资源的锁。在这一部分，要添加逻辑以在整个事务过程中获取和释放锁。
+
+**Acquisition Phase**
+
+**读取和写入**：最简单的锁定方案是根据需要简单锁定页面。由于所有对页面的读写都是通过 Page.PageBuffer 类执行的，因此仅更改这一点就足够了。修改Page.PageBuffer中的get和put方法，以实现使用尽可能最少的许可锁类型来锁定页面（并根据需要获取层次结构上的锁）。
+
+**扫描**：如果我们知道我们将扫描表的多个页面，那么我们最好只在表页面上的许多细粒度锁的表实例上获得一个锁。修改ridIterator和recordIterator方法以便在执行扫描之前获取表上适当的锁。
+
+**写入优化**：当我们修改页面时，我们几乎总是会先读取它（获取 IS/S 锁），然后写回对其的更新（升级到 IX/X 锁）。如果我们提前知道要修改页面，则可以直接获取 IX/X 锁来跳过获取 IS/S 锁的过程。修改以下方法来预先请求适当的锁定：
+
+- PageDirectory#getPageWithSpace
+
+- Table#updateRecord
+
+- Table#deleteRecord
+
+
+**Release Phase**
+
+此时，事务应该获取执行查询所需的大量锁，但不会释放任何锁！我们将在数据库中使用严格的Two-Phase Locking，这意味着只有在事务完成时才会在清理方法中释放锁。修改Database.TransactionContextImpl的close方法，释放事务获取的所有锁。你应该使用 LockContext#release 而不是 LockManager#release。LockManager不会验证多粒度约束，但与此同时其他事务需要假设满足这些约束，因此需要维护这些约束。最后，需要注意不能按任意顺序释放锁，要考虑释放顺序。

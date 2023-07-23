@@ -22,11 +22,11 @@ import java.util.function.UnaryOperator;
 
 /**
  * Internal transaction-specific methods, used for implementing parts of the database.
- *
+ * <p>
  * The transaction context for the transaction currently running on the current thread
  * can be fetched via TransactionContext::getTransaction; it is only set during the middle
  * of a Transaction call.
- *
+ * <p>
  * This transaction context implementation assumes that exactly one transaction runs
  * on a thread at a time, and that, aside from the unblock() method, no methods
  * of the transaction are called from a different thread than the thread that the
@@ -42,6 +42,7 @@ public abstract class TransactionContext implements AutoCloseable {
 
     /**
      * Fetches the current transaction running on this thread.
+     *
      * @return transaction actively running on this thread or null if none
      */
     public static TransactionContext getTransaction() {
@@ -55,6 +56,7 @@ public abstract class TransactionContext implements AutoCloseable {
 
     /**
      * Sets the current transaction running on this thread.
+     *
      * @param transaction transaction currently running
      */
     public static void setTransaction(TransactionContext transaction) {
@@ -91,6 +93,7 @@ public abstract class TransactionContext implements AutoCloseable {
     public abstract void close();
 
     // Temp Tables and Aliasing ////////////////////////////////////////////////
+
     /**
      * Create a temporary table within this transaction.
      *
@@ -107,6 +110,7 @@ public abstract class TransactionContext implements AutoCloseable {
     /**
      * Specify an alias mapping for this transaction. Recursive aliasing is
      * not allowed.
+     *
      * @param aliasMap mapping of alias names to original table names
      */
     public abstract void setAliasMap(Map<String, String> aliasMap);
@@ -210,14 +214,14 @@ public abstract class TransactionContext implements AutoCloseable {
     public abstract int getNumDataPages(String tableName);
 
     /**
-     * @param tableName name of table
+     * @param tableName  name of table
      * @param columnName name of column
      * @return order of B+ tree index on tableName.columnName
      */
     public abstract int getTreeOrder(String tableName, String columnName);
 
     /**
-     * @param tableName name of table
+     * @param tableName  name of table
      * @param columnName name of column
      * @return height of B+ tree index on tableName.columnName
      */

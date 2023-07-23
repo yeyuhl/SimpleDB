@@ -44,36 +44,36 @@ import java.util.function.UnaryOperator;
  * Database objects keeps track of transactions, tables, and indices
  * and delegates work to its disk manager, buffer manager, lock manager and
  * recovery manager.
- *
+ * <p>
  * A Database instance operates on files in the directory specified by the `fileDir`
  * argument in the constructors. The files in this directory will be modified by
  * a DiskSpaceManager instance. Upon starting up for the following partitions
  * are allocated through the disk space manager:
- *  - Partition 0: used for log records from the recovery manager
- *  - Partition 1: used by the _metadata.tables table, which persists
- *    information about user created tables
- *  - Partition 2: used by the _metadata.indices table, which persists
- *    information about user created indices
- *
+ * - Partition 0: used for log records from the recovery manager
+ * - Partition 1: used by the _metadata.tables table, which persists
+ * information about user created tables
+ * - Partition 2: used by the _metadata.indices table, which persists
+ * information about user created indices
+ * <p>
  * Each partition corresponds to a file in `fileDir`. The remaining partitions
  * are used for user created tables and are allocated as tables are created.
- *
+ * <p>
  * Metadata tables are manually synchronized and use a special locking hierarchy
  * to improve concurrency. The methods to lock and access metadata has already
  * been implemented.
  * - _metadata.tables is a child resource of the database. The children of
- *   _metadata.tables are the names of a regular user tables. For example, if a
- *   user wants exclusive access on the metadata of the table `myTable`, they
- *   would have to acquire an X lock on the resource `database/_metadata.tables/mytable`.
- *
+ * _metadata.tables are the names of a regular user tables. For example, if a
+ * user wants exclusive access on the metadata of the table `myTable`, they
+ * would have to acquire an X lock on the resource `database/_metadata.tables/mytable`.
+ * <p>
  * - _metadata.indices is a child resource of the database. The children of
- *   _metadata.indices are the names of regular user tables. The grandchildren are
- *   the names of indices. For example, if a user wants to get shared access to
- *   the index on column `rowId` of `someTable`, they would need to acquire an
- *   S lock on `database/_metadata.indices/someTable/rowId`. If a user wanted
- *   to acquire exclusive access on all of the indices of `someTable` (for example
- *   to insert a new record into every index) they would need to acquire an
- *   X lock on `database/_metadata.indices/someTable`.
+ * _metadata.indices are the names of regular user tables. The grandchildren are
+ * the names of indices. For example, if a user wants to get shared access to
+ * the index on column `rowId` of `someTable`, they would need to acquire an
+ * S lock on `database/_metadata.indices/someTable/rowId`. If a user wanted
+ * to acquire exclusive access on all of the indices of `someTable` (for example
+ * to insert a new record into every index) they would need to acquire an
+ * X lock on `database/_metadata.indices/someTable`.
  */
 public class Database implements AutoCloseable {
     private static final String METADATA_TABLE_PREFIX = "_metadata.";
@@ -121,7 +121,7 @@ public class Database implements AutoCloseable {
      * @param fileDir the directory to put the table files in
      */
     public Database(String fileDir) {
-        this (fileDir, DEFAULT_BUFFER_SIZE);
+        this(fileDir, DEFAULT_BUFFER_SIZE);
     }
 
     /**
@@ -130,7 +130,7 @@ public class Database implements AutoCloseable {
      * - Clock eviction policy
      * - Recovery manager disabled (DummyRecoverManager)
      *
-     * @param fileDir the directory to put the table files in
+     * @param fileDir        the directory to put the table files in
      * @param numMemoryPages the number of pages of memory in the buffer cache
      */
     public Database(String fileDir, int numMemoryPages) {
@@ -142,9 +142,9 @@ public class Database implements AutoCloseable {
      * - Clock eviction policy
      * - Recovery manager disabled (DummyRecoverManager)
      *
-     * @param fileDir the directory to put the table files in
+     * @param fileDir        the directory to put the table files in
      * @param numMemoryPages the number of pages of memory in the buffer cache
-     * @param lockManager the lock manager
+     * @param lockManager    the lock manager
      */
     public Database(String fileDir, int numMemoryPages, LockManager lockManager) {
         this(fileDir, numMemoryPages, lockManager, new ClockEvictionPolicy());
@@ -153,10 +153,10 @@ public class Database implements AutoCloseable {
     /**
      * Creates a new database with recovery disabled (DummyRecoveryManager)
      *
-     * @param fileDir the directory to put the table files in
+     * @param fileDir        the directory to put the table files in
      * @param numMemoryPages the number of pages of memory in the buffer cache
-     * @param lockManager the lock manager
-     * @param policy eviction policy for buffer cache
+     * @param lockManager    the lock manager
+     * @param policy         eviction policy for buffer cache
      */
     public Database(String fileDir, int numMemoryPages, LockManager lockManager,
                     EvictionPolicy policy) {
@@ -166,10 +166,10 @@ public class Database implements AutoCloseable {
     /**
      * Creates a new database.
      *
-     * @param fileDir the directory to put the table files in
-     * @param numMemoryPages the number of pages of memory in the buffer cache
-     * @param lockManager the lock manager
-     * @param policy eviction policy for buffer cache
+     * @param fileDir            the directory to put the table files in
+     * @param numMemoryPages     the number of pages of memory in the buffer cache
+     * @param lockManager        the lock manager
+     * @param policy             eviction policy for buffer cache
      * @param useRecoveryManager flag to enable or disable the recovery manager (ARIES)
      */
     public Database(String fileDir, int numMemoryPages, LockManager lockManager,
@@ -248,7 +248,7 @@ public class Database implements AutoCloseable {
     private void initIndexInfo() {
         long indexInfoPage0 = DiskSpaceManager.getVirtualPageNum(2, 0);
         diskSpaceManager.allocPage(indexInfoPage0);
-        LockContext indexInfoContext =  new DummyLockContext("_dummyIndexInfo");
+        LockContext indexInfoContext = new DummyLockContext("_dummyIndexInfo");
         PageDirectory pageDirectory = new PageDirectory(bufferManager, 2, indexInfoPage0, (short) 0,
                 indexInfoContext);
         indexMetadata = new Table(INDEX_INFO_TABLE_NAME, getIndexInfoSchema(), pageDirectory, indexInfoContext, stats);
@@ -326,7 +326,7 @@ public class Database implements AutoCloseable {
 
     /**
      * @return Schema for _metadata.tables with fields:
-     *   | field name   | field type
+     * | field name   | field type
      * --+--------------+-------------------------
      * 0 | table_name   | string(32)
      * 1 | part_num     | int
@@ -343,7 +343,7 @@ public class Database implements AutoCloseable {
 
     /**
      * @return Schema for _metadata.indices with fields:
-     *   | field name          | field type
+     * | field name          | field type
      * --+---------------------+------------
      * 0 | table_name          | string(32)
      * 1 | col_name            | string(32)
@@ -408,8 +408,8 @@ public class Database implements AutoCloseable {
      */
     private List<Pair<RecordId, TableMetadata>> scanTableMetadata() {
         List<Pair<RecordId, TableMetadata>> result = new ArrayList<>();
-        synchronized(tableMetadata) {
-            for(RecordId rid: (Iterable<RecordId>) tableMetadata::ridIterator) {
+        synchronized (tableMetadata) {
+            for (RecordId rid : (Iterable<RecordId>) tableMetadata::ridIterator) {
                 Record record = tableMetadata.getRecord(rid);
                 TableMetadata metadata = new TableMetadata(record);
                 result.add(new Pair<>(rid, metadata));
@@ -420,8 +420,8 @@ public class Database implements AutoCloseable {
 
     public List<Record> scanTableMetadataRecords() {
         List<Record> result = new ArrayList<>();
-        synchronized(tableMetadata) {
-            for(RecordId rid: (Iterable<RecordId>) tableMetadata::ridIterator) {
+        synchronized (tableMetadata) {
+            for (RecordId rid : (Iterable<RecordId>) tableMetadata::ridIterator) {
                 Record record = tableMetadata.getRecord(rid);
                 result.add(record);
             }
@@ -461,8 +461,8 @@ public class Database implements AutoCloseable {
      */
     private List<Pair<RecordId, BPlusTreeMetadata>> scanIndexMetadata() {
         List<Pair<RecordId, BPlusTreeMetadata>> result = new ArrayList<>();
-        synchronized(indexMetadata) {
-            for(RecordId rid: (Iterable<RecordId>) indexMetadata::ridIterator) {
+        synchronized (indexMetadata) {
+            for (RecordId rid : (Iterable<RecordId>) indexMetadata::ridIterator) {
                 Record record = indexMetadata.getRecord(rid);
                 BPlusTreeMetadata metadata = new BPlusTreeMetadata(record);
                 result.add(new Pair<>(rid, metadata));
@@ -473,8 +473,8 @@ public class Database implements AutoCloseable {
 
     public List<Record> scanIndexMetadataRecords() {
         List<Record> result = new ArrayList<>();
-        synchronized(indexMetadata) {
-            for(RecordId rid: (Iterable<RecordId>) indexMetadata::ridIterator) {
+        synchronized (indexMetadata) {
+            for (RecordId rid : (Iterable<RecordId>) indexMetadata::ridIterator) {
                 Record record = indexMetadata.getRecord(rid);
                 result.add(record);
             }
@@ -494,7 +494,7 @@ public class Database implements AutoCloseable {
         columnName = normalize(columnName);
         // We'll need shared access to the entry if it exists in order to read it
         LockUtil.ensureSufficientLockHeld(getColumnIndexMetadataContext(tableName, columnName), LockType.S);
-        for (Pair<RecordId, BPlusTreeMetadata> p: scanIndexMetadata()) {
+        for (Pair<RecordId, BPlusTreeMetadata> p : scanIndexMetadata()) {
             BPlusTreeMetadata metadata = p.getSecond();
             String currTableName = normalize(metadata.getTableName());
             String currColumnName = normalize(metadata.getColName());
@@ -516,7 +516,7 @@ public class Database implements AutoCloseable {
         tableName = normalize(tableName);
         // We'll need shared access to the entry if it exists in order to read it
         LockUtil.ensureSufficientLockHeld(getTableIndexMetadataContext(tableName), LockType.S);
-        for (Pair<RecordId, BPlusTreeMetadata> p: scanIndexMetadata()) {
+        for (Pair<RecordId, BPlusTreeMetadata> p : scanIndexMetadata()) {
             BPlusTreeMetadata metadata = p.getSecond();
             String currTableName = normalize(metadata.getTableName());
             if (currTableName.equals(tableName)) {
@@ -675,7 +675,7 @@ public class Database implements AutoCloseable {
             String columnName = normalize(metadata.getColName());
             // Exclusive access is needed on the index metadata entry to update it
             LockUtil.ensureSufficientLockHeld(getColumnIndexMetadataContext(tableName, columnName), LockType.X);
-            for (Pair<RecordId, BPlusTreeMetadata> p: scanIndexMetadata()) {
+            for (Pair<RecordId, BPlusTreeMetadata> p : scanIndexMetadata()) {
                 RecordId rid = p.getFirst();
                 BPlusTreeMetadata currMetadata = p.getSecond();
                 String currColumnName = normalize(currMetadata.getColName());
@@ -753,7 +753,7 @@ public class Database implements AutoCloseable {
             Schema s = tab.getSchema();
             List<String> colNames = s.getFieldNames();
 
-            for (Pair<RecordId, BPlusTreeMetadata> p: getTableIndicesMetadata(tableName)) {
+            for (Pair<RecordId, BPlusTreeMetadata> p : getTableIndicesMetadata(tableName)) {
                 BPlusTree tree = indexFromMetadata(p.getSecond());
                 String column = tree.getMetadata().getColName();
                 DataBox key = record.getValue(colNames.indexOf(column));
@@ -770,7 +770,7 @@ public class Database implements AutoCloseable {
             Record record = tab.deleteRecord(rid);
             List<String> colNames = s.getFieldNames();
 
-            for (Pair<RecordId, BPlusTreeMetadata> p: getTableIndicesMetadata(tableName)) {
+            for (Pair<RecordId, BPlusTreeMetadata> p : getTableIndicesMetadata(tableName)) {
                 BPlusTree tree = indexFromMetadata(p.getSecond());
                 String column = tree.getMetadata().getColName();
                 DataBox key = record.getValue(colNames.indexOf(column));
@@ -793,7 +793,7 @@ public class Database implements AutoCloseable {
             Record old = tab.updateRecord(rid, updated);
             List<String> colNames = s.getFieldNames();
 
-            for (Pair<RecordId, BPlusTreeMetadata> p: getTableIndicesMetadata(tableName)) {
+            for (Pair<RecordId, BPlusTreeMetadata> p : getTableIndicesMetadata(tableName)) {
                 BPlusTree tree = indexFromMetadata(p.getSecond());
                 String column = tree.getMetadata().getColName();
                 DataBox oldKey = old.getValue(colNames.indexOf(column));
@@ -818,7 +818,7 @@ public class Database implements AutoCloseable {
             int pindex = -1;
             if (predColumnName != null) pindex = s.findField(predColumnName);
 
-            while(recordIds.hasNext()) {
+            while (recordIds.hasNext()) {
                 RecordId curRID = recordIds.next();
                 Record cur = getRecord(tableName, curRID);
                 List<DataBox> recordCopy = cur.getValues();
@@ -837,7 +837,7 @@ public class Database implements AutoCloseable {
             Schema s = tab.getSchema();
             int uindex = s.findField(targetColumnName);
 
-            while(recordIds.hasNext()) {
+            while (recordIds.hasNext()) {
                 RecordId curRID = recordIds.next();
                 Record cur = getRecord(tableName, curRID);
                 List<DataBox> recordCopy = cur.getValues();
@@ -859,7 +859,7 @@ public class Database implements AutoCloseable {
             Schema s = tab.getSchema();
             int pindex = s.getFieldNames().indexOf(predColumnName);
 
-            while(recordIds.hasNext()) {
+            while (recordIds.hasNext()) {
                 RecordId curRID = recordIds.next();
                 Record cur = getRecord(tableName, curRID);
                 List<DataBox> recordCopy = cur.getValues();
@@ -875,7 +875,7 @@ public class Database implements AutoCloseable {
             tableName = tab.getName();
             Iterator<RecordId> recordIds = tab.ridIterator();
 
-            while(recordIds.hasNext()) {
+            while (recordIds.hasNext()) {
                 RecordId curRID = recordIds.next();
                 Record cur = getRecord(tableName, curRID);
                 DataBox cond = condition.apply(cur);
@@ -916,7 +916,8 @@ public class Database implements AutoCloseable {
         public int getTreeOrder(String tableName, String columnName) {
             if (aliases.containsKey(tableName)) tableName = aliases.get(tableName);
             Pair<RecordId, BPlusTreeMetadata> pair = getColumnIndexMetadata(tableName, columnName);
-            if (pair == null) throw new DatabaseException("Index `" + tableName + "." + columnName + "` does not exist!");
+            if (pair == null)
+                throw new DatabaseException("Index `" + tableName + "." + columnName + "` does not exist!");
             return pair.getSecond().getOrder();
         }
 
@@ -924,14 +925,21 @@ public class Database implements AutoCloseable {
         public int getTreeHeight(String tableName, String columnName) {
             if (aliases.containsKey(tableName)) tableName = aliases.get(tableName);
             Pair<RecordId, BPlusTreeMetadata> pair = getColumnIndexMetadata(tableName, columnName);
-            if (pair == null) throw new DatabaseException("Index `" + tableName + "." + columnName + "` does not exist!");
+            if (pair == null)
+                throw new DatabaseException("Index `" + tableName + "." + columnName + "` does not exist!");
             return pair.getSecond().getHeight();
         }
 
         @Override
         public void close() {
             try {
-                // TODO(proj4_part2)
+                //在事务完成时在清理方法中释放锁
+                TransactionContext transaction = TransactionContext.getTransaction();
+                List<Lock> acquiredLocks = lockManager.getLocks(transaction);
+                for (int i = acquiredLocks.size() - 1; i >= 0; i--) {
+                    // 用LockContext释放，维护多粒度约束
+                    LockContext.fromResourceName(lockManager, acquiredLocks.get(i).name).release(transaction);
+                }
                 return;
             } catch (Exception e) {
                 // There's a chance an error message from your release phase
@@ -1071,13 +1079,13 @@ public class Database implements AutoCloseable {
             LockUtil.ensureSufficientLockHeld(getTableMetadataContext(tableName), LockType.X);
             LockUtil.ensureSufficientLockHeld(getTableIndexMetadataContext(tableName), LockType.X);
 
-            for (Pair<RecordId, BPlusTreeMetadata> p: getTableIndicesMetadata(tableName)) {
+            for (Pair<RecordId, BPlusTreeMetadata> p : getTableIndicesMetadata(tableName)) {
                 BPlusTreeMetadata tree = p.getSecond();
                 dropIndex(tableName, tree.getColName());
             }
             RecordId rid = getTableMetadata(tableName).getFirst();
             TableMetadata metadata;
-            synchronized(tableMetadata) {
+            synchronized (tableMetadata) {
                 metadata = new TableMetadata(tableMetadata.deleteRecord(rid));
             }
             bufferManager.freePart(metadata.partNum);
@@ -1088,7 +1096,7 @@ public class Database implements AutoCloseable {
             // For something as drastic as dropping all tables we'll want
             // to get an exclusive lock on the entire database.
             LockUtil.ensureSufficientLockHeld(lockManager.databaseContext(), LockType.X);
-            for (Pair<RecordId, TableMetadata> p: scanTableMetadata()) {
+            for (Pair<RecordId, TableMetadata> p : scanTableMetadata()) {
                 dropTable(p.getSecond().tableName);
             }
         }
@@ -1233,8 +1241,8 @@ public class Database implements AutoCloseable {
     }
 
     public void dropDemoTables() {
-        for (String table: demoTables) {
-            try(Transaction t = beginTransaction()) {
+        for (String table : demoTables) {
+            try (Transaction t = beginTransaction()) {
                 t.dropTable(table);
             } catch (DatabaseException e) {
                 // If table doesn't exist, continue
@@ -1247,7 +1255,7 @@ public class Database implements AutoCloseable {
 
         dropDemoTables();
 
-        for (String table: demoTables) {
+        for (String table : demoTables) {
             loadCSV(table);
         }
 
@@ -1257,6 +1265,7 @@ public class Database implements AutoCloseable {
 
     /**
      * Loads a CSV from src/main/resources in as a table.
+     *
      * @param name the name of the csv file (without .csv extension)
      * @return true if the table already existed in the database, false otherwise
      */
@@ -1287,7 +1296,7 @@ public class Database implements AutoCloseable {
             row = buffered.readLine();
         }
 
-        try(Transaction t = beginTransaction()) {
+        try (Transaction t = beginTransaction()) {
             t.createTable(schema, name);
         } catch (DatabaseException e) {
             if (e.getMessage().contains("already exists")) return true;
