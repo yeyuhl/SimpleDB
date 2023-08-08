@@ -934,11 +934,11 @@ public class Database implements AutoCloseable {
         public void close() {
             try {
                 //在事务完成时在清理方法中释放锁
-                TransactionContext transaction = TransactionContext.getTransaction();
-                List<Lock> acquiredLocks = lockManager.getLocks(transaction);
-                for (int i = acquiredLocks.size() - 1; i >= 0; i--) {
-                    // 用LockContext释放，维护多粒度约束
-                    LockContext.fromResourceName(lockManager, acquiredLocks.get(i).name).release(transaction);
+                List<Lock> locks = lockManager.getLocks(new TransactionContextImpl(getTransNum(), recoveryTransaction));
+                Collections.reverse(locks);
+                for (Lock l : locks) {
+                    LockContext lc = LockContext.fromResourceName(lockManager, l.name);
+                    lc.release(this);
                 }
                 return;
             } catch (Exception e) {
