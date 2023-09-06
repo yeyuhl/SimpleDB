@@ -19,6 +19,7 @@ public enum LockType {
      * 如果一个事务可以在某个资源上持有类型A的锁，同时另一个事务在同一资源上持有类型B的锁，则这些锁类型是兼容的。
      */
     public static boolean compatible(LockType a, LockType b) {
+        // TODO(proj4_part1): implement
         if (a == null || b == null) {
             throw new NullPointerException("null lock type");
         }
@@ -74,6 +75,7 @@ public enum LockType {
      * 判断parentLockType是否有权向子级授予childLockType。
      */
     public static boolean canBeParentLock(LockType parentLockType, LockType childLockType) {
+        // TODO(proj4_part1): implement
         if (parentLockType == null || childLockType == null) {
             throw new NullPointerException("null lock type");
         }
@@ -99,6 +101,7 @@ public enum LockType {
      * 判断一个锁是否可以用于替代另一个锁（例如，S锁可以用X锁代替），substitute替代required。
      */
     public static boolean substitutable(LockType substitute, LockType required) {
+        // TODO(proj4_part1): implement
         if (required == null || substitute == null) {
             throw new NullPointerException("null lock type");
         }

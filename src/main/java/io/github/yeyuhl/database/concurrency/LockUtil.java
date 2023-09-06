@@ -32,6 +32,7 @@ public class LockUtil {
         LockType effectiveLockType = lockContext.getEffectiveLockType(transaction);
         LockType explicitLockType = lockContext.getExplicitLockType(transaction);
 
+        // TODO(proj4_part2): implement
         // case1：当前锁的类型可以有效地替代请求的类型
         if (LockType.substitutable(effectiveLockType, requestType)) {
             return;

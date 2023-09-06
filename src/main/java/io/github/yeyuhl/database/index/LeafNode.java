@@ -1,6 +1,5 @@
 package io.github.yeyuhl.database.index;
 
-import com.sun.webkit.PageCache;
 import io.github.yeyuhl.database.common.Buffer;
 import io.github.yeyuhl.database.common.Pair;
 import io.github.yeyuhl.database.concurrency.LockContext;
@@ -17,7 +16,7 @@ import java.util.*;
  * B+树的叶节点，d阶B+树中的每个叶节点都存储着d到2d(key, record id)个对和一个指向其右同级叶节点的指针（即其page number）
  * 此外，每个叶节点同样都是序列化并持久化在单个page上
  * 例如，下面是连接在一起的两个2阶叶节点的图示：
- * <p>
+ *
  * leaf 1 (stored on some page)          leaf 2 (stored on some other page)
  * +-------+-------+-------+-------+     +-------+-------+-------+-------+
  * | k0:r0 | k1:r1 | k2:r2 |       | --> | k3:r3 | k4:r4 |       |       |
@@ -51,14 +50,14 @@ class LeafNode extends BPlusNode {
      * 该叶节点的keys和record ids
      * 其中“keys”始终按升序排序，在索引i处的record id对应于索引i处的键
      * 例如，keys [a， b， c] 和 rids [1， 2， 3] 表示配对 [a：1， b：2， c：3]
-     * <p>
+     *
      * keys和rids是存储在磁盘上的keys和record ids在内存中的缓存，因此，要考虑在创建两个指向同一page的LeafNode对象时会发生什么情况：
      * BPlusTreeMetadata meta = ...;
      * int pageNum = ...;
      * LockContext treeContext = new DummyLockContext();
      * LeafNode leaf0 = LeafNode.fromBytes(meta, bufferManager, treeContext, pageNum);
      * LeafNode leaf1 = LeafNode.fromBytes(meta, bufferManager, treeContext, pageNum);
-     * <p>
+     *
      * 此方案如下所示：
      * HEAP                        | DISK
      * ===============================================================
@@ -75,10 +74,10 @@ class LeafNode extends BPlusNode {
      * | rids = [r0, r1, r2]     | |
      * | pageNum = 42            | |
      * +-------------------------+ |
-     * <p>
+     *
      * 现在想象一下，我们对leaf0执行操作，如leaf0.put(k3,r3)，leaf0的内存中值将更新，并将同步到磁盘
      * 但是，leaf1内存中的值将不会更新。这将看起来像这样：
-     * <p>
+     *
      * HEAP                        | DISK
      * ===============================================================
      * leaf0                       | page 42
@@ -94,7 +93,7 @@ class LeafNode extends BPlusNode {
      * | rids = [r0, r1, r2]     | |
      * | pageNum = 42            | |
      * +-------------------------+ |
-     * <p>
+     *
      * 这就是缓存一致性问题，我们需要保证不会使用过时的内存中缓存的keys和rids的值
      */
     private List<DataBox> keys;
@@ -152,6 +151,7 @@ class LeafNode extends BPlusNode {
 
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
+        // TODO(proj2): implement
         // 先判断是否存在相同的key
         if (keys.contains(key)) {
             throw new BPlusTreeException("insert duplicate entries with the same key");
@@ -183,6 +183,7 @@ class LeafNode extends BPlusNode {
 
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data, float fillFactor) {
+        // TODO(proj2): implement
         // 叶节点的能存储的最大records数
         int maxRecords = (int) Math.ceil(2 * metadata.getOrder() * fillFactor);
         while (keys.size() < maxRecords && data.hasNext()) {
@@ -336,7 +337,7 @@ class LeafNode extends BPlusNode {
     /**
      * 给定一个page number为1的叶节点，存储有三个(key, rid)pairs，(0, (0, 0))，(1, (1, 1))和(2, (2, 2))
      * 用dot表示为：
-     * <p>
+     *
      * node1[label = "{0: (0 0)|1: (1 1)|2: (2 2)}"];
      */
     @Override

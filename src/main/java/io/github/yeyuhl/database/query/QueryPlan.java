@@ -547,12 +547,9 @@ public class QueryPlan {
     // Task 5: Single Table Access Selection ///////////////////////////////////
 
     /**
-     * Gets all select predicates for which there exists an index on the column
-     * referenced in that predicate for the given table and where the predicate
-     * operator can be used in an index scan.
+     * 获取所有选择谓词，这些谓词在给定表的谓词中引用的列上存在索引，并且可以在索引扫描中使用谓词运算符。
      *
-     * @return a list of indices of eligible selection predicates in
-     * this.selectPredicates
+     * @return this.selectPredicates中合格的选择谓词的索引列表
      */
     private List<Integer> getEligibleIndexColumns(String table) {
         List<Integer> result = new ArrayList<>();
@@ -568,16 +565,12 @@ public class QueryPlan {
     }
 
     /**
-     * Applies all eligible select predicates to a given source, except for the
-     * predicate at index except. The purpose of except is because there might
-     * be one select predicate that was already used for an index scan, so
-     * there's no point applying it again. A select predicate is represented as
-     * an element in this.selectPredicates. `except` corresponds to the index
-     * of the predicate in that list.
+     * 将所有符合条件的选择谓词应用于给定的源，index except处的谓词除外。
+     * 这样做目的是因为可能有一个选择谓词已用于索引扫描，因此没有必要再次应用它。
+     * 选择谓词表示为 this.selectPredicates 中的元素， “ except ”对应于该列表中谓词的索引。
      *
-     * @param source a source operator to apply the selections to
-     * @param except the index of a selection to skip. You can use the value -1
-     *               if you don't want to skip anything.
+     * @param source 要应用于selections的a source operator。
+     * @param except 查询时要跳过的索引。如果您不想跳过任何东西，可以使用值 -1。
      * @return a new query operator after select predicates have been applied
      */
     private QueryOperator addEligibleSelections(QueryOperator source, int except) {
@@ -605,6 +598,7 @@ public class QueryPlan {
      * 注意，最小成本运算符的并列可以被任意打破
      */
     public QueryOperator minCostSingleAccess(String table) {
+        // TODO(proj3_part2): implement
         QueryOperator minOp = new SequentialScanOperator(this.transaction, table);
         // 计算顺序扫描的成本
         int minCost = minOp.estimateIOCost();
@@ -629,9 +623,8 @@ public class QueryPlan {
     // Task 6: Join Selection //////////////////////////////////////////////////
 
     /**
-     * Given a join predicate between left and right operators, finds the lowest
-     * cost join operator out of join types in JoinOperator.JoinType. By default
-     * only considers SNLJ and BNLJ to prevent dependencies on GHJ, Sort and SMJ.
+     * 给定左运算符和右运算符之间的连接谓词，从 JoinOperator.JoinType 中的连接类型中查找成本最低的连接运算符。
+     * 默认情况下仅考虑 SNLJ 和 BNLJ，以防止依赖于 GHJ、Sort 和 SMJ。
      * <p>
      * Reminder: Your implementation does not need to consider cartesian products
      * and does not need to keep track of interesting orders.
@@ -658,11 +651,13 @@ public class QueryPlan {
     }
 
     /**
-     * 遍历上一次搜索中的所有表集。对于每个表集，检查每个连接谓词，看是否有一个有效的连接与一个新表
-     * 如果有，找到最小成本的连接，并返回一个从每个被连接的表名集合到其最低成本连接运算符的映射
+     * 迭代上一次搜索中的所有表集。对于每个表集，检查每个连接谓词，查看是否存在与新表的有效连接
+     * 如果有，找到最小成本的连接，并返回一个从每个要连接的表名集合到其最低成本连接运算符的映射
+     * <p>
+     * 连接谓词存储为“this.joinPredicates”的元素。
      *
-     * @param prevMap  将一个表集映射到表集上的query operator，每个集合应该有pass number - 1个元素
-     * @param pass1Map 每一个集合都正好包含一个表，映射到一个单表访问（扫描）的query operator
+     * @param prevMap  将a set of tables映射到set of tables上的query operator，每个集合应该有pass number - 1个元素
+     * @param pass1Map 每一个集合都正好包含一个表映射到一个单表访问（扫描）的query operator
      * @return 表名到join QueryOperator的映射，每组表名中的元素数量应该等于pass number
      */
     public Map<Set<String>, QueryOperator> minCostJoins(Map<Set<String>, QueryOperator> prevMap, Map<Set<String>, QueryOperator> pass1Map) {
@@ -673,8 +668,8 @@ public class QueryPlan {
         //   For each join predicate listed in this.joinPredicates
         //      Get the left side and the right side of the predicate (table name and column)
         //
-        //      Case 1: 集合包含左表不包含右表，使用pass 1 Map获取一个运算符来访问右表
-        //      Case 2: 集合包含右表不包含左表，使用pass 1 Map获取一个运算符来访问左表
+        //      Case 1: 集合包含左表不包含右表，使用pass1Map获取一个运算符来访问右表
+        //      Case 2: 集合包含右表不包含左表，使用pass1Map获取一个运算符来访问左表
         //      Case 3: 否则，跳过这个连接谓词，继续循环
         //      使用来自case 1和2的运算符，使用minCostJoinType来计算新表（从pass1Map获取的表）和先前连接的表之间成本最低的连接，然后更新结果映射（如果需要的话）
         for (Set<String> prevSet : prevMap.keySet()) {
@@ -686,7 +681,7 @@ public class QueryPlan {
                 if (prevSet.contains(joinPredicate.leftTable) && !prevSet.contains(joinPredicate.rightTable)) {
                     tableSet.add(joinPredicate.rightTable);
                     QueryOperator rightQuery = pass1Map.get(tableSet);
-                    // 注意这里传参顺序
+                    // 注意这里传参顺序，之所以要这样，是因为要遵守left deep plan，让连接表在左，单表在右
                     joinOperator = minCostJoinType(prevMap.get(prevSet), rightQuery, joinPredicate.leftColumn, joinPredicate.rightColumn);
                     newSet.add(joinPredicate.rightTable);
                 }
@@ -694,7 +689,6 @@ public class QueryPlan {
                 else if (prevSet.contains(joinPredicate.rightTable) && !prevSet.contains(joinPredicate.leftTable)) {
                     tableSet.add(joinPredicate.leftTable);
                     QueryOperator leftQuery = pass1Map.get(tableSet);
-                    // 注意这里传参顺序，之所以要这样，是因为要遵守left deep plan，让连接表在左，单表在右
                     joinOperator = minCostJoinType(prevMap.get(prevSet), leftQuery, joinPredicate.rightColumn, joinPredicate.leftColumn);
                     newSet.add(joinPredicate.leftTable);
                 }
@@ -702,13 +696,7 @@ public class QueryPlan {
                 else {
                     continue;
                 }
-                if (result.containsKey(newSet)) {
-                    if (result.get(newSet).estimateIOCost() > joinOperator.estimateIOCost()) {
-                        result.put(newSet, joinOperator);
-                    }
-                } else {
-                    result.put(newSet, joinOperator);
-                }
+                result.put(newSet, joinOperator);
             }
         }
         return result;
@@ -717,9 +705,8 @@ public class QueryPlan {
     // Task 7: Optimal Plan Selection //////////////////////////////////////////
 
     /**
-     * Finds the lowest cost QueryOperator in the given mapping. A mapping is
-     * generated on each pass of the search algorithm, and relates a set of tables
-     * to the lowest cost QueryOperator accessing those tables.
+     * 在给定的mapping中查找最低成本的QueryOperator。
+     * 搜索算法在每次pass中都会生成一个mapping，并将一组表与访问这些表的最低成本QueryOperator相关联。
      *
      * @return a QueryOperator in the given mapping
      */
@@ -741,12 +728,13 @@ public class QueryPlan {
     }
 
     /**
-     * 基于System R和成本的查询优化器生成一个优化的QueryPlan
+     * 生成一个优化的 QueryPlan 基于 the System R cost-based query optimizer.
      *
      * @return 一个records的迭代器，包含了查询的结果
      */
     public Iterator<Record> execute() {
         this.transaction.setAliasMap(this.aliases);
+        // TODO(proj3_part2): implement
         // Pass 1：对于每个表，找到访问该表的最低成本的QueryOperator，并构建每个表名到其最低成本运算符的映射
         // Pass i：在每一个pass中，使用前一个pass的结果和pass1的结果来找到每个表的最低成本连接，重复进行直到所有的表都被连接
         // 将最后的运算符设置为上一次pass中成本最低的那一个，添加group by，project，sort和limit运算符，返回最终运算符的迭代器

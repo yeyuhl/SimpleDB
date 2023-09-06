@@ -144,7 +144,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
      * - Emit(发出) the CLR
      * - 调用CLR上的redo来执行撤销操作
      * - 将当前 LSN 更新为下一条要撤销记录的 LSN
-     * <p>
+     *
      * 请注意，在记录上调用.undo()并不执行撤销操作，它只是创建补偿日志记录(CLR)。
      *
      * @param transNum transaction to perform a rollback for
@@ -175,7 +175,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * 在从缓冲区缓存中刷新页面之前调用，日志页永远不会调用此方法。
-     * <p>
+     *
      * The log should be as far as necessary.
      *
      * @param pageLSN pageLSN of page about to be flushed
@@ -197,9 +197,9 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * 在写入页面时调用。
-     * <p>
+     *
      * 从不在日志页上调用此方法，前后参数的参数长度保证相同。
-     * <p>
+     *
      * 应添加相应的日志记录，并相应更新事务表和脏页表。
      *
      * @param transNum   transaction performing the write
@@ -354,7 +354,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * 将事务回滚到保存点。
-     * <p>
+     *
      * 事务自保存点以来所做的所有更改都应按相反顺序撤销，并将相应的CLR写入日志。事务状态应保持不变。
      *
      * @param transNum transaction to partially rollback
@@ -367,7 +367,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
         // 在LSN记录之后，所有严格意义上的事务变更都应撤销。
         long savepointLSN = transactionEntry.getSavepoint(name);
-
+        // TODO(proj5): implement
         rollbackToLSN(transNum, savepointLSN);
         return;
     }
@@ -390,6 +390,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
         Map<Long, Pair<Transaction.Status, Long>> chkptTxnTable = new HashMap<>();
 
         int numDPTRecords = 0;
+        // TODO(proj5): generate end checkpoint record(s) for DPT and transaction table
         // 遍历脏页表，获取脏页的page number
         for (Long pg : dirtyPageTable.keySet()) {
             numDPTRecords++;
@@ -475,23 +476,23 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * 该方法执行重启恢复的analysis pass。
-     * <p>
+     *
      * 首先，应读取主记录（LSN 0）。主记录包含一条信息：上次成功检查点的LSN。
      * 然后，从上次成功检查点的开头开始扫描日志记录。
-     * <p>
+     *
      * 如果日志记录涉及事务操作（getTransNum存在）：
      * - 更新事务表
-     * <p>
+     *
      * 如果日志记录涉及页面（getPageNum存在），更新dpt：
      * - update/undoupdate页面会弄脏页面
      * - free/undoalloc页面总是将更改刷新到磁盘
      * - alloc/undofree页面不需要任何操作
-     * <p>
+     *
      * 如果日志记录与事务状态变化有关：
      * - 如果是END_TRANSACTION：清理事务（Transaction#cleanup），从事务表中删除，并添加到endedTransactions
      * - 将事务状态更新为COMMITTING/RECOVERY_ABORTING/COMPLETE
      * - 更新事务表
-     * <p>
+     *
      * 如果日志记录是END_CHECKPOINT记录：
      * - 复制检查点DPT的所有条目（如果有现有条目，则替换现有条目）
      * - 跳过已经结束的事务的事务表条目
@@ -510,6 +511,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
         long LSN = masterRecord.lastCheckpointLSN;
         // 已完成的事务集
         Set<Long> endedTransactions = new HashSet<>();
+        // TODO(proj5): implement
         Iterator<LogRecord> i = logManager.scanFrom(LSN);
         while (i.hasNext()) {
             LogRecord next = i.next();
@@ -608,15 +610,16 @@ public class ARIESRecoveryManager implements RecoveryManager {
 
     /**
      * 此方法执行重启恢复的redo pass。
-     * <p>
+     *
      * 首先，从脏页表中确定REDO的起点
-     * <p>
+     *
      * 然后，从起点开始扫描，如果记录是redoable并且：
      * - 关于分区（Alloc/Free/UndoAlloc/UndoFree..Part），总是redo
      * - 分配页面（AllocPage/UndoFreePage），总是redo
      * - 修改了脏页表中的页面（Update/UndoUpdate/Free/UndoAlloc....Page）且LSN >= recLSN，从磁盘获取该页面，检查pageLSN，并在需要时重做记录。
      */
     void restartRedo() {
+        // TODO(proj5): implement
         // DPT为空不用redo
         if (dirtyPageTable.isEmpty()) {
             return;
@@ -668,6 +671,7 @@ public class ARIESRecoveryManager implements RecoveryManager {
      * - 如果记录的undoNextLSN可用，则用它来替换集合中的条目，如果不可用则用prevLSN; 并且如果新的LSN为0，则结束事务并将其从队列和事务表中删除。
      */
     void restartUndo() {
+        // TODO(proj5): implement
         PriorityQueue<Pair<Long, LogRecord>> undo = new PriorityQueue<>(new PairFirstReverseComparator<>());
         Map<Long, Long> lastLSN = new HashMap<>();
         // 创建一个按所有中止事务其lastLSN大小作为排序的优先级队列

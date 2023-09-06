@@ -77,10 +77,10 @@ public class SortMergeOperator extends JoinOperator {
     /**
      * An implementation of Iterator that provides an iterator interface for this operator.
      * See lecture slides.
-     * <p>
+     *
      * Before proceeding, you should read and understand SNLJOperator.java
      * You can find it in the same directory as this file.
-     * <p>
+     *
      * Word of advice: try to decompose the problem into distinguishable sub-problems.
      * This means you'll probably want to add more methods than those given (Once again,
      * SNLJOperator.java might be a useful reference).
@@ -136,6 +136,7 @@ public class SortMergeOperator extends JoinOperator {
          * 返回应从此连接生成的下一条record，如果没有则返回null
          */
         private Record fetchNextRecord() {
+            // TODO(proj3_part1): implement
             if (leftRecord == null) {
                 return null;
             }
@@ -154,7 +155,7 @@ public class SortMergeOperator extends JoinOperator {
                     }
                     rightRecord = rightIterator.next();
                 }
-                // mark实际上是对S表的record进行标记
+                // 匹配成功，mark实际上是对S表的record进行标记
                 rightIterator.markPrev();
                 this.marked = true;
             }

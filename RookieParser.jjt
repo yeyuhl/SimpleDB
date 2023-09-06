@@ -8,8 +8,8 @@ options{
     VISITOR = true;
     NODE_DEFAULT_VOID=true;
     JDK_VERSION="1.11";
-    OUTPUT_DIRECTORY="src/main/java/edu/berkeley/cs186/database/cli/parser";
-    JJTREE_OUTPUT_DIRECTORY="src/main/java/edu/berkeley/cs186/database/cli/parser";
+    OUTPUT_DIRECTORY="src/main/java/io/github/yeyuhl/database/cli/parser";
+    JJTREE_OUTPUT_DIRECTORY="src/main/java/io/github/yeyuhl/database/cli/parser";
     VISITOR_RETURN_TYPE="void";
 }
 

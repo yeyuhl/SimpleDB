@@ -21,7 +21,7 @@ abstract class BPlusNode {
     /**
      * node.get(k)返回对node进行查询时，k可能所在的叶节点
      * 例如，考虑以下B+树（为简洁起见，只显示键；省略了记录id）。
-     * <p>
+     *
      *                               inner
      *                               +----+----+----+----+
      *                               | 10 | 20 |    |    |
@@ -33,7 +33,7 @@ abstract class BPlusNode {
      *   |  1 |  2 |  3 |    |->| 11 | 12 | 13 |    |->| 21 | 22 | 23 |    |
      *   +----+----+----+----+  +----+----+----+----+  +----+----+----+----+
      *   leaf0                  leaf1                  leaf2
-     * <p>
+     *
      * inner.get(x)应该返回：
      * leaf0 when x < 10
      * leaf1 when 10 <= x < 20
@@ -52,7 +52,7 @@ abstract class BPlusNode {
      * 1.如果插入后不会导致node溢出，则返回Optional.empty()
      * 2.如果插入后会导致node溢出，那么node就会被分割为一个左节点和右节点并返回一对(split_key, right_node_page_num)，
      * 其中right_node_page_num是新创建的右节点的页码，而split_key取决于node是一个内部节点还是一个叶子节点
-     * <p>
+     *
      * 举个例子：
      * 1.往前面的B+树中插入key为4的entry，满足情况1，插入后的B+树如下：
      *                               inner
@@ -66,7 +66,7 @@ abstract class BPlusNode {
      *   |  1 |  2 |  3 |  4 |->| 11 | 12 | 13 |    |->| 21 | 22 | 23 |    |
      *   +----+----+----+----+  +----+----+----+----+  +----+----+----+----+
      *   leaf0                  leaf1                  leaf2
-     * <p>
+     *
      * 2.在上面的基础上，在插入key为5的entry，满足情况2，插入后的B+树如下：
      *                          inner
      *                          +--+--+--+--+
@@ -80,7 +80,7 @@ abstract class BPlusNode {
      *   +--+--+--+--+  +--+--+--+--+  +--+--+--+--+  +--+--+--+--+
      *   leaf0          leaf3          leaf1          leaf2
      * 可以看到leaf0由于溢出，创建了一个新的兄弟节点leaf3，d个entries在leaf0(d是5/2=2)，d+1及之后的entries在leaf3
-     * <p>
+     *
      * 当一个内部节点分裂时，前d个entries在原来节点，最后d个entries在新创建的节点，而中间的entries则向上移动（不是复制）
      * 举个例子：
      * +---+---+---+---+
@@ -91,7 +91,7 @@ abstract class BPlusNode {
      * | 1 | 2 |   |   |  | 4 | 5 |   |   |
      * +---+---+---+---+  +---+---+---+---+
      * 此时split_key为3
-     * <p>
+     *
      * 除了以上提及的情况，不要以任何其他方式重新分配entries，例如不要在节点之间移动entries以避免拆分
      * 此外，SimpleDB不支持具有相同key的两条重复entries，如果有重复的key插入到一个叶子节点中，B+树并不会发生改变并且会抛出BPlusTreeException
      */

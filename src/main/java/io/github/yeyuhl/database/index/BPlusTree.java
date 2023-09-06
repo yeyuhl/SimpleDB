@@ -19,31 +19,31 @@ import java.util.*;
 /**
  * 一棵持久化的B+树
  * BPlusTree tree = new BPlusTree(bufferManager, metadata, lockContext);
- * <p>
+ *
  * // 往树中插入一些值
  * tree.put(new IntDataBox(0), new RecordId(0, (short) 0));
  * tree.put(new IntDataBox(1), new RecordId(1, (short) 1));
  * tree.put(new IntDataBox(2), new RecordId(2, (short) 2));
- * <p>
+ *
  * // 从树中获取一些值
  * tree.get(new IntDataBox(0)); // Optional.of(RecordId(0, 0))
  * tree.get(new IntDataBox(1)); // Optional.of(RecordId(1, 1))
  * tree.get(new IntDataBox(2)); // Optional.of(RecordId(2, 2))
  * tree.get(new IntDataBox(3)); // Optional.empty();
- * <p>
+ *
  * // 遍历树中的record ids
  * tree.scanEqual(new IntDataBox(2));        // [(2, 2)]
  * tree.scanAll();                           // [(0, 0), (1, 1), (2, 2)]
  * tree.scanGreaterEqual(new IntDataBox(1)); // [(1, 1), (2, 2)]
- * <p>
+ *
  * // 删除树上的一些元素
  * tree.get(new IntDataBox(0)); // Optional.of(RecordId(0, 0))
  * tree.remove(new IntDataBox(0));
  * tree.get(new IntDataBox(0)); // Optional.empty()
- * <p>
+ *
  * // 加载一棵树 (与创建一棵新树相同)
  * BPlusTree fromDisk = new BPlusTree(bufferManager, metadata, lockContext);
- * <p>
+ *
  * // 所有的值还在那里
  * fromDisk.get(new IntDataBox(0)); // Optional.empty()
  * fromDisk.get(new IntDataBox(1)); // Optional.of(RecordId(1, 1))
@@ -82,7 +82,7 @@ public class BPlusTree {
      * - the order of the tree,
      * - the partition number of the tree,
      * - the page number of the root of the tree.
-     * <p>
+     *
      * 在给定分区上分配的所有页,都是内部节点和叶节点的序列化。
      */
     public BPlusTree(BufferManager bufferManager, BPlusTreeMetadata metadata, LockContext lockContext) {

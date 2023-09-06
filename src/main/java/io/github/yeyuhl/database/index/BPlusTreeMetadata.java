@@ -27,8 +27,10 @@ public class BPlusTreeMetadata {
     private final Type keySchema;
 
     /**
-     * B+树的阶数。给定阶数为d的树，其内部节点存储d到2d个键和d+1到2d+1个子节点指针。
-     * 叶节点存储d到2d个（键，记录id）pairs。值得注意的是，包括根节点和已删除的叶节点；这些可能包含少于d个条目。
+     * B+树的阶数，一般来说是指每个节点所能存储最大的entries数目，但是在这里是最大的entries数目的一半。
+     * 也就是说order * 2才是每个节点能存储的最大的entries数目。
+     * 给定order为d的树，其内部节点存储d到2d个键和d+1到2d+1个子节点指针。
+     * 叶节点存储d到2d个(key, record id) pairs。值得注意的是，包括根节点和已删除的叶节点；这些可能包含少于d个条目。
      */
     private final int order;
 

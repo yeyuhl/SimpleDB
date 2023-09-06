@@ -16,7 +16,7 @@ import java.util.*;
  * B+树的内部节点，d阶B+树中的每个内部节点存储着d到2d个键
  * 具有n个键的内部节点存储指向子节点的n+1个“指针”（指针其实是一个page number），此外每个内部节点都序列化并持久化在单个page上
  * 例如，下面是2阶的内部节点的图示：
- * <p>
+ *
  * +----+----+----+----+
  * | 10 | 20 | 30 |    |
  * +----+----+----+----+
@@ -103,11 +103,12 @@ class InnerNode extends BPlusNode {
     }
 
     /**
-     * put和bulkLoad的辅助方法，用于将键和子节点插入到内部节点中
+     * put和bulkLoad的辅助方法，用于将键和子节点指针存入到内部节点中
      */
     private Optional<Pair<DataBox, Long>> insert(DataBox key, Long child) {
-        // 查看key和node应该插入的位置
+        // 查看key应该插入的位置
         int index = numLessThanEqual(key, keys);
+        // 将key和child插入到对应的位置
         keys.add(index, key);
         children.add(index + 1, child);
         // 查看插入后的键的数量是否超过了2d
@@ -136,6 +137,7 @@ class InnerNode extends BPlusNode {
 
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
+        // TODO(proj2): implement
         BPlusNode child = BPlusNode.fromBytes(metadata, bufferManager, treeContext, children.get(numLessThanEqual(key, keys)));
         Optional<Pair<DataBox, Long>> pair = child.put(key, rid);
         if (pair.isPresent()) {
@@ -148,6 +150,7 @@ class InnerNode extends BPlusNode {
 
     @Override
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data, float fillFactor) {
+        // TODO(proj2): implement
         BPlusNode rightMostChild = BPlusNode.fromBytes(metadata, bufferManager, treeContext, children.get(children.size() - 1));
         // 实际上调用的是LeafNode的bulkLoad
         Optional<Pair<DataBox, Long>> pair = rightMostChild.bulkLoad(data, fillFactor);
@@ -239,7 +242,7 @@ class InnerNode extends BPlusNode {
     /**
      * 给定一个按升序排序的列表ys，而numLessThanEqual(x,ys)返回ys中小于或等于x的元素的数量
      * 举个例子：
-     * <p>
+     *
      * numLessThanEqual(0, Arrays.asList(1, 2, 3, 4, 5)) == 0
      * numLessThanEqual(1, Arrays.asList(1, 2, 3, 4, 5)) == 1
      * numLessThanEqual(2, Arrays.asList(1, 2, 3, 4, 5)) == 2
@@ -247,16 +250,16 @@ class InnerNode extends BPlusNode {
      * numLessThanEqual(4, Arrays.asList(1, 2, 3, 4, 5)) == 4
      * numLessThanEqual(5, Arrays.asList(1, 2, 3, 4, 5)) == 5
      * numLessThanEqual(6, Arrays.asList(1, 2, 3, 4, 5)) == 5
-     * <p>
+     *
      * 当我们沿着B+树向下遍历并需要决定要访问哪个子节点时，此辅助函数很有用
      * 举个例子：假设一个索引节点具有4个键和5个子指针
-     * <p>
+     *
      * +---+---+---+---+
      * | a | b | c | d |
      * +---+---+---+---+
      * /   |   |   |    \
      * 0   1   2   3     4
-     * <p>
+     *
      * 如果我们在树中搜索c，那么我们需要访问子节点3。并非巧合的是，还有3个值小于或等于c（即 a、b、c）。
      */
     static <T extends Comparable<T>> int numLessThanEqual(T x, List<T> ys) {
@@ -306,7 +309,7 @@ class InnerNode extends BPlusNode {
 
     /**
      * 第0页上具有单个键k和第1、2页上有两个子节点的内部节点将转换为以下 DOT 片段
-     * <p>
+     *
      * node0[label = "<f0>|k|<f1>"];
      * ... // children
      * "node0":f0 -> "node1";

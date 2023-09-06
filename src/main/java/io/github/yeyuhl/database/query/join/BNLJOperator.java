@@ -17,6 +17,9 @@ import java.util.NoSuchElementException;
  * @since 2023/6/28
  */
 public class BNLJOperator extends JoinOperator {
+    /**
+     * buffer pages的数量，Math.min(this.workMem, this.numMemoryPages)
+     */
     protected int numBuffers;
 
     public BNLJOperator(QueryOperator leftSource,
@@ -78,10 +81,11 @@ public class BNLJOperator extends JoinOperator {
         /**
          * 从左侧源获取下一个records块，leftBlockIterator应设置为回溯迭代器
          * 该迭代器最多包含来自左侧源的B-2页records，并且leftRecord应设置为此块中的第一条record
-         * <p>
+         *
          * 如果左侧源中没有更多的records，则此方法应不执行任何操作
          */
         private void fetchNextLeftBlock() {
+            // TODO(proj3_part1): implement
             // 没有更多的records，返回
             if (!leftSourceIterator.hasNext()) {
                 return;
@@ -93,8 +97,8 @@ public class BNLJOperator extends JoinOperator {
         }
 
         /**
-         * 从正确的来源获取下一页records，rightPage迭代器应设置为回溯迭代器，最多包含来自正确源的一页records
-         * <p>
+         * 从正确的来源获取下一页records，rightPageIterator应设置为回溯迭代器，最多包含来自正确源的一页records
+         *
          * 如果右侧源中没有更多的records，则此方法应不执行任何操作
          */
         private void fetchNextRightPage() {
@@ -109,6 +113,7 @@ public class BNLJOperator extends JoinOperator {
          * 返回应从此连接生成的下一条record(两个record连接形成的新record)，如果没有则返回null
          */
         private Record fetchNextRecord() {
+            // TODO(proj3_part1): implement
             Record rightRecord;
             while (true) {
                 if (rightPageIterator.hasNext()) {

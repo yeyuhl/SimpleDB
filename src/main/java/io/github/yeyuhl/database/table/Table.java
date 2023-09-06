@@ -313,6 +313,7 @@ public class Table implements BacktrackingIterable<Record> {
         // If we're updating a record we'll need exclusive access to the page
         // its on.
         LockContext pageContext = tableContext.childContext(rid.getPageNum());
+        // TODO(proj4_part2): Update the following line
         // 修改操作，获取X锁
         LockUtil.ensureSufficientLockHeld(pageContext, LockType.X);
 
@@ -339,7 +340,7 @@ public class Table implements BacktrackingIterable<Record> {
     public synchronized Record deleteRecord(RecordId rid) {
         validateRecordId(rid);
         LockContext pageContext = tableContext.childContext(rid.getPageNum());
-
+        // TODO(proj4_part2): Update the following line
         // 修改操作，获取X锁
         LockUtil.ensureSufficientLockHeld(pageContext, LockType.X);
 

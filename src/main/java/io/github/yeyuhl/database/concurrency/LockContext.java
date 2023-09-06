@@ -112,6 +112,7 @@ public class LockContext {
      */
     public void acquire(TransactionContext transaction, LockType lockType)
             throws InvalidLockException, DuplicateLockRequestException {
+        // TODO(proj4_part2): implement
         if (readonly) {
             throw new UnsupportedOperationException("the context is readonly");
         }
@@ -137,6 +138,7 @@ public class LockContext {
      * @throws UnsupportedOperationException 如果context是只读的。
      */
     public void release(TransactionContext transaction) throws NoLockHeldException, InvalidLockException {
+        // TODO(proj4_part2): implement
         if (readonly) {
             throw new UnsupportedOperationException("the context is readonly");
         }
@@ -166,6 +168,7 @@ public class LockContext {
      */
     public void promote(TransactionContext transaction, LockType newLockType)
             throws DuplicateLockRequestException, NoLockHeldException, InvalidLockException {
+        // TODO(proj4_part2): implement
         if (readonly) {
             throw new UnsupportedOperationException("the context is readonly");
         }
@@ -224,6 +227,7 @@ public class LockContext {
      * @throws UnsupportedOperationException 如果context是只读的。
      */
     public void escalate(TransactionContext transaction) throws NoLockHeldException {
+        // TODO(proj4_part2): implement
         if (readonly) {
             throw new UnsupportedOperationException("the context is readonly");
         }
@@ -282,6 +286,7 @@ public class LockContext {
      */
     public LockType getExplicitLockType(TransactionContext transaction) {
         if (transaction == null) return LockType.NL;
+        // TODO(proj4_part2): implement
         return lockman.getLockType(transaction, getResourceName());
     }
 
@@ -291,6 +296,7 @@ public class LockContext {
      */
     public LockType getEffectiveLockType(TransactionContext transaction) {
         if (transaction == null) return LockType.NL;
+        // TODO(proj4_part2): implement
         // 先获取显式锁
         LockType lockType = getExplicitLockType(transaction);
         if (lockType != LockType.NL) {
@@ -314,6 +320,7 @@ public class LockContext {
      * Helper method，用于查看事务是否在此context的祖先处持有SIX锁。
      */
     private boolean hasSIXAncestor(TransactionContext transaction) {
+        // TODO(proj4_part2): implement
         LockContext ancestorCTX = parentContext();
         // 遍历祖先
         while (ancestorCTX != null) {
@@ -329,6 +336,7 @@ public class LockContext {
      * Helper method，用于获取指定事务的当前context的后代中所有S或IS锁的资源名称列表。
      */
     private List<ResourceName> sisDescendants(TransactionContext transaction) {
+        // TODO(proj4_part2): implement
         List<ResourceName> names = new ArrayList<>();
         List<Lock> locks = lockman.getLocks(transaction);
         for (Lock lock : locks) {

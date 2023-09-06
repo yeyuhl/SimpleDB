@@ -115,6 +115,7 @@ public class PageDirectory implements BacktrackingIterable<Page> {
 
         Page page = this.firstHeader.loadPageWithSpace(requiredSpace);
         LockContext pageContext = lockContext.childContext(page.getPageNum());
+        // TODO(proj4_part2): Update the following line
         // 当我们修改页面时，我们几乎总是会先读取它（获取 IS/S 锁），然后写回对其的更新（升级到 IX/X 锁）。
         // 如果我们提前知道要修改页面，则可以直接获取 IX/X 锁来跳过获取 IS/S 锁的过程，因此这里传入的参数是LockType.X
         LockUtil.ensureSufficientLockHeld(pageContext, LockType.X);

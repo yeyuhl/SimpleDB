@@ -89,6 +89,7 @@ public class SortOperator extends QueryOperator {
      * @return 一个排序好的run，包含来自输入迭代器的所有records
      */
     public Run sortRun(Iterator<Record> records) {
+        // TODO(proj3_part1): implement
         Run sortedRun = new Run(transaction, getSchema());
         List<Record> listRecords = new ArrayList<>();
         while (records.hasNext()) {
@@ -100,16 +101,17 @@ public class SortOperator extends QueryOperator {
     }
 
     /**
-     * 给定一个包含有序的runs的列表，返回一个新的run，该run是合并输入runs的结果
+     * 给定一个包含有序的run的列表runs，返回一个新的run，该run是合并输入run的结果
      * 应该使用一个优先队列（PriorityQueue）来决定哪个record应该被添加到下一个输出run中
-     * <p>
-     * 优先队列中不允许有超过runs.size()条records，建议优先队列中存储Pair<Record, Integer>对象
+     *
+     * 优先队列中不允许有超过runs.size()条records，用优先队列存储Pair< Record, Integer >对象
      * 其中Pair(r, i)表示是来自run i的Record r，且r是当前未合并的run中最小的值，i可用于定位下一个要添加到队列中的record
      *
      * @return 通过合并输入runs获得一个排好序的run
      */
     public Run mergeSortedRuns(List<Run> runs) {
         assert (runs.size() <= this.numBuffers - 1);
+        // TODO(proj3_part1): implement
         Run sortedRun = new Run(transaction, getSchema());
         List<BacktrackingIterator<Record>> iters = new ArrayList<>();
         for (Run run : runs) {
@@ -139,9 +141,7 @@ public class SortOperator extends QueryOperator {
     }
 
     /**
-     * Compares the two (record, integer) pairs based only on the record
-     * component using the default comparator. You may find this useful for
-     * implementing mergeSortedRuns.
+     * 使用默认比较器仅基于record组件比较两个(Record, Integer)对
      */
     private class RecordPairComparator implements Comparator<Pair<Record, Integer>> {
         @Override
@@ -157,6 +157,7 @@ public class SortOperator extends QueryOperator {
      * @return 通过合并输入runs获得一个包含有序的runs的列表
      */
     public List<Run> mergePass(List<Run> runs) {
+        // TODO(proj3_part1): implement
         List<Run> mergedRuns = new ArrayList<>();
         int len = runs.size();
         int size = this.numBuffers - 1;
@@ -175,6 +176,7 @@ public class SortOperator extends QueryOperator {
     public Run sort() {
         // Iterator over the records of the relation we want to sort
         Iterator<Record> sourceIterator = getSource().iterator();
+        // TODO(proj3_part1): implement
         List<Run> sortedRuns = new ArrayList<>();
         while (sourceIterator.hasNext()) {
             // getBlockIterator方法返回一个包含numBuffers个records的迭代器

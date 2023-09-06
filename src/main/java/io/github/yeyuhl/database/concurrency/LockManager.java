@@ -42,6 +42,7 @@ public class LockManager {
          * 允许ID为“except”的事务所持有的锁发生冲突，这在事务尝试替换其资源上已经拥有的锁时非常有用。
          */
         public boolean checkCompatible(LockType lockType, long except) {
+            // TODO(proj4_part1): implement
             for (Lock lock : locks) {
                 if (lock.transactionNum == except) {
                     continue;
@@ -57,6 +58,7 @@ public class LockManager {
          * 为事务提供锁“lock”，假设锁是兼容的。如果事务已经拥有锁，则更新资源上的锁。
          */
         public void grantOrUpdateLock(Lock lock) {
+            // TODO(proj4_part1): implement
             long transactionNum = lock.transactionNum;
             for (Lock currLock : locks) {
                 if (currLock.transactionNum == transactionNum) {
@@ -76,6 +78,7 @@ public class LockManager {
          * 释放锁“lock”并处理队列，假设之前已授予锁。
          */
         public void releaseLock(Lock lock) {
+            // TODO(proj4_part1): implement
             locks.remove(lock);
             removeLockFromTransaction(lock);
             processQueue();
@@ -86,6 +89,7 @@ public class LockManager {
          * 如果addFront为true，则将“request”添加到队列的前面，否则添加到末尾。
          */
         public void addToQueue(LockRequest request, boolean addFront) {
+            // TODO(proj4_part1): implement
             if (addFront) {
                 waitingQueue.addFirst(request);
             } else {
@@ -100,6 +104,7 @@ public class LockManager {
          */
         private void processQueue() {
             Iterator<LockRequest> requests = waitingQueue.iterator();
+            // TODO(proj4_part1): implement
             LockRequest request;
             while (requests.hasNext()) {
                 request = requests.next();
@@ -126,6 +131,7 @@ public class LockManager {
          * 获取“transaction”对此资源所上的锁的类型。
          */
         public LockType getTransactionLockType(long transaction) {
+            // TODO(proj4_part1): implement
             for (Lock lock : locks) {
                 if (lock.transactionNum == transaction) {
                     return lock.lockType;
@@ -185,11 +191,11 @@ public class LockManager {
 
     /**
      * 为事务“transaction”获取“name”上的“lockType”锁，并在一次原子操作中获取该锁后释放该事务持有的“releaseNames”上的所有锁。
-     * <p>
+     *
      * 在获取或释放任何锁之前必须进行错误检查，如果新锁与资源上的另一个事务的锁不兼容，则该事务将被阻止，且其请求会被放置在资源的队列的前面。
-     * <p>
+     *
      * 仅在获取所请求的锁后才释放“releaseNames”上的锁，并且应该处理相应的队列。
-     * <p>
+     *
      * 在执行获取和释放的操作时，释放“name”上的旧锁的不应更改“name”上锁的获取时间。
      * 举个例子：如果事务按照以下顺序获取锁：S(A)、X(B)、获取X(A)和释放S(A)，则认为A上的锁在B上的锁之前已获取。
      *
@@ -198,6 +204,7 @@ public class LockManager {
      */
     public void acquireAndRelease(TransactionContext transaction, ResourceName name, LockType lockType, List<ResourceName> releaseNames)
             throws DuplicateLockRequestException, NoLockHeldException {
+        // TODO(proj4_part1): implement
         boolean shouldBlock = false;
         long transactionNum = transaction.getTransNum();
         synchronized (this) {
@@ -242,13 +249,13 @@ public class LockManager {
 
     /**
      * 为事务“transaction”获取“name”上的“lockType”锁。
-     * <p>
+     *
      * 获取锁之前必须进行错误检查,如果新锁与该资源上的另一个事务的锁不兼容，或者如果该资源的队列中有其他事务，则该事务将被阻止，并且该请求将被放置在资源名为NAME的队列的后面。
-     * <p>
      *
      * @throws DuplicateLockRequestException 如果“transaction”持有对“name”的lock
      */
     public void acquire(TransactionContext transaction, ResourceName name, LockType lockType) throws DuplicateLockRequestException {
+        // TODO(proj4_part1): implement
         boolean shouldBlock = false;
         long transactionNum = transaction.getTransNum();
         synchronized (this) {
@@ -276,12 +283,13 @@ public class LockManager {
 
     /**
      * 释放“transaction”对“name”上的lock，释放锁之前必须进行错误检查。
-     * <p>
+     *
      * 资源名称的队列应在此调用后处理，如果队列中的任何请求有需要释放的锁，则应释放这些锁，并处理相应的队列。
      *
      * @throws NoLockHeldException 如果“transaction”对“name”没有持有锁
      */
     public void release(TransactionContext transaction, ResourceName name) throws NoLockHeldException {
+        // TODO(proj4_part1): implement
         long transactionNum = transaction.getTransNum();
         synchronized (this) {
             ResourceEntry resourceEntry = getResourceEntry(name);
@@ -301,9 +309,9 @@ public class LockManager {
     /**
      * 将事务对“name”上持有的lock升级为“newLockType”。
      * 举个例子：将事务对“name”上持有的lock从当前lock type更改为“newLockType”（如果这是有效的替换）。
-     * <p>
+     *
      * 在更改任何锁之前必须进行错误检查，如果新锁与资源上的另一个事务的锁不兼容，则该事务将被阻止，并且请求将被放置在资源队列的前面。
-     * <p>
+     *
      * 锁的升级不应该改变锁的获取时间，即如果事务按照以下顺序获取锁：S(A)、X(B)、promoteX(A)，则A上的锁被认为是在B上的锁之前获取的。
      *
      * @throws DuplicateLockRequestException 如果“transaction”已经在“name”上有一个“newLockType”的锁
@@ -312,27 +320,28 @@ public class LockManager {
      */
     public void promote(TransactionContext transaction, ResourceName name, LockType newLockType)
             throws DuplicateLockRequestException, NoLockHeldException, InvalidLockException {
+        // TODO(proj4_part1): implement
         boolean shouldBlock = false;
-        long transactionNum = transaction.getTransNum();
+        long transNum = transaction.getTransNum();
         synchronized (this) {
-            ResourceEntry resourceEntry = getResourceEntry(name);
-            if (resourceEntry.getTransactionLockType(transactionNum) == LockType.NL) {
-                throw new NoLockHeldException("Transaction " + transactionNum + " does not hold a lock on " + name);
+            ResourceEntry entry = getResourceEntry(name);
+            if (entry.getTransactionLockType(transNum) == newLockType) {
+                throw new DuplicateLockRequestException("transaction " + transNum + " already has a " + newLockType + " " + name);
             }
-            if (resourceEntry.getTransactionLockType(transactionNum) == newLockType) {
-                throw new DuplicateLockRequestException("Transaction " + transactionNum + " already holds a lock on " + name);
+            if (entry.getTransactionLockType(transNum) == LockType.NL) {
+                throw new NoLockHeldException("transaction " + transNum + " has no lock on " + name);
             }
-            if (!LockType.substitutable(newLockType, resourceEntry.getTransactionLockType(transactionNum))) {
-                throw new InvalidLockException("Invalid lock promotion");
+            if (!LockType.substitutable(newLockType, entry.getTransactionLockType(transNum))) {
+                throw new InvalidLockException("the new lock type is not substitutable for the old lock");
             }
-            Lock lock = new Lock(name, newLockType, transactionNum);
-            if (!resourceEntry.checkCompatible(newLockType, transactionNum)) {
+            Lock lock = new Lock(name, newLockType, transNum);
+            if (!entry.checkCompatible(newLockType, transNum)) {
                 shouldBlock = true;
                 LockRequest request = new LockRequest(transaction, lock);
-                resourceEntry.addToQueue(request, true);
+                entry.addToQueue(request, true);
                 transaction.prepareBlock();
             } else {
-                resourceEntry.grantOrUpdateLock(lock);
+                entry.grantOrUpdateLock(lock);
             }
         }
         if (shouldBlock) {
@@ -344,6 +353,7 @@ public class LockManager {
      * 返回“transaction”对“name”上的锁的类型，如果没有持有锁，则返回NL。
      */
     public synchronized LockType getLockType(TransactionContext transaction, ResourceName name) {
+        // TODO(proj4_part1): implement
         ResourceEntry resourceEntry = getResourceEntry(name);
         long transactionNum = transaction.getTransNum();
         return resourceEntry.getTransactionLockType(transactionNum);

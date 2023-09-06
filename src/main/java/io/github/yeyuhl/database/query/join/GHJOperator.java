@@ -75,6 +75,7 @@ public class GHJOperator extends JoinOperator {
      * @param pass       当前pass（用于选择一个hash函数）
      */
     private void partition(Partition[] partitions, Iterable<Record> records, boolean left, int pass) {
+        // TODO(proj3_part1): implement the partitioning logic
         for (Record record : records) {
             // 先判断左侧还是右侧，根据其index，获取对应的columnValue
             DataBox columnValue = left ? record.getValue(getLeftColumnIndex()) : record.getValue(getRightColumnIndex());
@@ -122,7 +123,7 @@ public class GHJOperator extends JoinOperator {
                     "Neither the left nor the right records in this partition " + "fit in B-2 pages of memory."
             );
         }
-
+        // TODO(proj3_part1): implement the building and probing stage
         Map<DataBox, List<Record>> hashTable = new HashMap<>();
         // Building stage
         for (Record buildRecord : buildRecords) {
@@ -166,6 +167,7 @@ public class GHJOperator extends JoinOperator {
         this.partition(rightPartitions, rightRecords, false, pass);
 
         for (int i = 0; i < leftPartitions.length; i++) {
+            // TODO(proj3_part1): implement the rest of grace hash join
             // 如果可以在一个分区上执行build和probe，则执行
             if (leftPartitions[i].getNumPages() <= this.numBuffers - 2 || rightPartitions[i].getNumPages() <= this.numBuffers - 2) {
                 buildAndProbe(leftPartitions[i], rightPartitions[i]);
@@ -223,10 +225,10 @@ public class GHJOperator extends JoinOperator {
 
     /**
      * 该方法仅在test中被testBreakSHJButPassGHJ调用
-     * <p>
+     *
      * 为leftRecords和rightRecords提供两个records列表，在这种情况下，SHJ会出错，但GHJ会成功运行
      * createRecord(int val)接收一个整数值，并返回a record with that value in the column being joined on
-     * <p>
+     *
      * 两个连接都可以访问B=6的buffers，每个page恰好可以容纳8条records
      *
      * @return Pair of leftRecords and rightRecords
@@ -236,9 +238,10 @@ public class GHJOperator extends JoinOperator {
         ArrayList<Record> rightRecords = new ArrayList<>();
 
         // SHJ breaks when trying to join them but not GHJ
-        // B-1是分区数量上限，每个分区最大为B-2，所以最多可以有(B-1) * (B-2) * 8+1=161条records
+        // B-1是分区数量上限，每个分区最大为B-2，所以最多可以有(B-1) * (B-2) * 8 + 1 = 161条records
         // So with (B-1) * (B-2) * 8 + 1 = 161 records, SHJ will fail
         // In fact, due to the key skew, with fewer records, SHJ may also fail
+        // TODO(proj3_part1): populate leftRecords and rightRecords such that
         for (int i = 0; i < 161; i++) {
             leftRecords.add(createRecord(i));
             rightRecords.add(createRecord(i));
@@ -248,10 +251,10 @@ public class GHJOperator extends JoinOperator {
 
     /**
      * 该方法仅在test中被GHJBreak调用
-     * <p>
+     *
      * 为leftRecords和rightRecords提供两个records列表，在这种情况下，GHJ会出错，但SHJ会成功运行（在我们的例子中达到最大传递次数）
      * createRecord(int val)接收一个整数值，并返回a record with that value in the column being joined on
-     * <p>
+     *
      * 两个连接都可以访问B=6的buffers，每个page恰好可以容纳8条records
      *
      * @return Pair of leftRecords and rightRecords
